@@ -1,0 +1,299 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-gray-200 dark:border-gray-700;
+  }
+
+  body {
+    @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Scrollbar Styles */
+@layer components {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-gray-500;
+  }
+}
+
+/* Typography */
+@layer components {
+  .prose {
+    @apply max-w-none;
+  }
+
+  .prose p {
+    @apply leading-7 mb-4;
+  }
+
+  .prose code {
+    @apply bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono;
+  }
+
+  .prose pre {
+    @apply bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto;
+  }
+
+  .prose pre code {
+    @apply bg-transparent p-0;
+  }
+
+  .prose blockquote {
+    @apply border-l-4 border-gray-200 dark:border-gray-700 pl-4 italic;
+  }
+
+  .prose h1 {
+    @apply text-3xl font-bold mb-6;
+  }
+
+  .prose h2 {
+    @apply text-2xl font-semibold mb-4;
+  }
+
+  .prose h3 {
+    @apply text-xl font-semibold mb-3;
+  }
+}
+
+/* Message Bubbles */
+@layer components {
+  .message-bubble {
+    @apply relative rounded-2xl px-4 py-2 max-w-[80%];
+  }
+
+  .message-bubble.user {
+    @apply bg-blue-500 text-white ml-auto;
+  }
+
+  .message-bubble.assistant {
+    @apply bg-gray-100 dark:bg-gray-800 mr-auto;
+  }
+
+  .chat-input {
+    @apply w-full rounded-lg border border-gray-200 dark:border-gray-700 
+           px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 
+           dark:bg-gray-800 dark:text-white transition-all duration-200;
+  }
+
+  .primary-button {
+    @apply px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+}
+
+/* Animation */
+@layer utilities {
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .dark-mode-transition {
+    @apply transition-colors duration-200;
+  }
+}
+
+/* Student Assessment Styles */
+@layer components {
+  .assessment-container {
+    @apply max-w-4xl mx-auto px-4 py-8;
+  }
+
+  .assessment-title {
+    @apply text-3xl font-bold mb-6 text-center;
+  }
+
+  .question-container {
+    @apply mb-8 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md;
+  }
+
+  .question-title {
+    @apply text-xl font-semibold mb-4;
+  }
+
+  .timer {
+    @apply text-lg font-mono mb-4 text-blue-600 dark:text-blue-400;
+  }
+
+  .answer-textarea {
+    @apply w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md 
+           focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100;
+  }
+
+  .next-button {
+    @apply mt-4 px-6 py-2 bg-blue-500 text-white rounded-md 
+           hover:bg-blue-600 focus:outline-none focus:ring-2 
+           focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200;
+  }
+}
+
+/* Assessment Platform Styles */
+@layer components {
+  .assessment-container {
+    @apply max-w-4xl mx-auto px-4 py-8;
+  }
+
+  .question-container {
+    @apply mb-8 p-6 bg-gray-800 rounded-lg shadow-md transition-all duration-300 ease-in-out;
+  }
+
+  .question-container:hover {
+    @apply shadow-lg transform scale-102;
+  }
+
+  .question-title {
+    @apply text-xl font-semibold mb-4 text-indigo-300;
+  }
+
+  .timer {
+    @apply text-lg font-mono mb-4 text-indigo-400;
+  }
+
+  .answer-textarea {
+    @apply w-full p-3 border border-gray-600 rounded-md 
+         focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+         bg-gray-700 text-gray-100 transition-all duration-200;
+  }
+
+  .next-button {
+    @apply mt-4 px-6 py-2 bg-indigo-600 text-white rounded-md 
+         hover:bg-indigo-700 focus:outline-none focus:ring-2 
+         focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200;
+  }
+}
+
+/* Animations */
+@layer utilities {
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .assessment-container {
+    @apply px-2 py-4;
+  }
+
+  .question-container {
+    @apply p-4;
+  }
+
+  .question-title {
+    @apply text-lg;
+  }
+}
+
