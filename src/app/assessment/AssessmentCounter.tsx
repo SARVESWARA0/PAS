@@ -288,18 +288,17 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
 
   const handleNext = () => {
     const currentResponse = responses[currentSection]?.[currentQuestion]?.response || ""
-    if (currentSection === "innovationMindset" && currentResponse.trim().split(/\s+/).length < 5) {
-      setErrorMessage("Provide at least 5 words for innovation answers.");
-      return;
+    if (currentResponse.trim().split(/\s+/).length < 5) {
+      setErrorMessage("Please provide an answer with at least 5 words before moving to the next question.")
+      return
     }
-    
     setErrorMessage("")
     handleEnd(currentQuestion, currentSection)
-    if (currentSection === "innovationMindset" && currentQuestion === innovationQuestions.length - 1) {
-      setCurrentSection("professionalCommunication");
-      setCurrentQuestion(0);
-    }
-    else if (currentSection === "professionalCommunication" && currentQuestion === 4) {
+    if (currentSection === "innovationMindset" && currentQuestion === 4) {
+      setCurrentSection("professionalCommunication")
+      setCurrentQuestion(0)
+      handleStart(0)
+    } else if (currentSection === "professionalCommunication" && currentQuestion === 4) {
       setShowConfirmation(true)
     } else {
       const nextQuestion = currentQuestion + 1
@@ -369,9 +368,15 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
   }, [blockCopyPaste])
 
   useEffect(() => {
-    handleStart(currentQuestion);
-  }, [currentQuestion, currentSection]);
-  
+    handleStart(currentQuestion)
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [currentQuestion, handleStart])
+
   const currentQuestionData =
     currentSection === "innovationMindset"
       ? (innovationQuestions as unknown as InnovationQuestion[])[currentQuestion]
@@ -383,8 +388,7 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
   const handleQuestionSelect = (index: number) => {
     if (index <= currentQuestion || (index >= 5 && currentSection === "innovationMindset")) {
       setCurrentSection(index < 5 ? "innovationMindset" : "professionalCommunication");
-      setCurrentQuestion(index < 5 ? index : index - 5);
-      
+      setCurrentQuestion(index % 5);
     }
   };
   

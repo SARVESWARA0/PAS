@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import AssessmentContent from "./AssessmentCounter"
 
-export default function AssessmentPage() {
+function AssessmentPageContent() {
   const [userName, setUserName] = useState("")
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -23,4 +23,12 @@ export default function AssessmentPage() {
   }
 
   return <AssessmentContent userName={userName} />
+}
+
+export default function AssessmentPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AssessmentPageContent />
+    </Suspense>
+  )
 }
