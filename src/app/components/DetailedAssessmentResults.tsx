@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { ChevronDown, ChevronUp, AlertCircle, ArrowRight } from "lucide-react"
+import { ChevronDown, ChevronUp, ArrowRight } from "lucide-react"
 
 interface AssessmentReportProps {
   results: {
@@ -33,8 +33,8 @@ interface AssessmentReportProps {
         recommendations?: string[]
       }
     }
-    behavioralData?: BehavioralData
   }
+  behavioralData: BehavioralData | undefined
 }
 
 interface BehavioralData {
@@ -129,47 +129,51 @@ const QuestionSection: React.FC<{ questionData: QuestionAnalysis; questionNumber
   </div>
 )
 
-const calculateDeductions = (behavioralData: BehavioralData) => {
+const calculateDeductions = (behavioralData: BehavioralData | undefined) => {
   if (!behavioralData) return 0
-
   let deductions = 0
-  const {
-    totalTabSwitchCount = 0,
-    totalUnusualTypingCount = 0,
-    totalPasteCount = 0,
-    timeOverruns = {},
-  } = behavioralData
+  console.log(behavioralData)
+  const { totalTabSwitchCount, totalUnusualTypingCount, totalPasteCount, timeOverruns } = behavioralData
 
-  if (totalTabSwitchCount > 2) deductions += 0.2
-  if (totalUnusualTypingCount > 4) deductions += 0.2
-  if (totalPasteCount > 3) deductions += 0.3
+  // Deductions for tab switching
+  if (totalTabSwitchCount > 2) {
+    deductions += Math.min((totalTabSwitchCount - 2) * 0.1, 0.2)
+  }
 
-  // Calculate time overrun deductions
+  // Deductions for unusual typing patterns
+  if (totalUnusualTypingCount > 4) {
+    deductions += Math.min((totalUnusualTypingCount - 4) * 0.05, 0.2)
+  }
+
+  // Deductions for copy/paste actions
+  if (totalPasteCount > 3) {
+    deductions += Math.min((totalPasteCount - 3) * 0.1, 0.3)
+  }
+
+  // Deductions for time overruns
+  let timeOverrunCount = 0
   Object.values(timeOverruns).forEach((section) => {
     Object.values(section).forEach((overrun) => {
-      if (overrun) deductions += 0.3
+      if (overrun) timeOverrunCount++
     })
   })
+  deductions += Math.min(timeOverrunCount * 0.3, 0.3)
 
   return Math.min(deductions, 1) // Cap deductions at 1.0
 }
 
-const AssessmentReport: React.FC<AssessmentReportProps> = ({ results }) => {
+const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioralData }) => {
   const router = useRouter()
   const [showFullReport, setShowFullReport] = useState(false)
 
-  // Use useMemo to calculate deductions and scores only when results change
   const { deductions, adjustedOverallRating, innovationScore, communicationScore, chartData } = useMemo(() => {
-    const deductions = calculateDeductions(results.behavioralData)
+    const deductions = calculateDeductions(behavioralData)
 
-    // Get base scores from results
-    const innovationScore = results.overallAssessment.innovationScore || 0
-    const communicationScore = results.overallAssessment.communicationScore || 0
+    const innovationScore = results.overallAssessment.innovationScore
+    const communicationScore = results.overallAssessment.communicationScore
 
-    // Calculate adjusted overall rating
-    const adjustedOverallRating = Math.max(0, innovationScore + communicationScore - deductions)
+    const adjustedOverallRating = Math.max(0, (innovationScore + communicationScore) / 2 - deductions)
 
-    // Prepare chart data with adjusted scores
     const chartData = [
       { name: "Innovation", score: innovationScore },
       { name: "Communication", score: communicationScore },
@@ -183,7 +187,7 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results }) => {
       communicationScore,
       chartData,
     }
-  }, [results])
+  }, [results, behavioralData])
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -346,52 +350,43 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results }) => {
                   </div>
                   <div className="bg-gray-800/30 p-6 rounded-lg">
                     <h4 className="text-xl font-medium mb-4 text-indigo-300">Behavioral Analysis:</h4>
-                    {results.behavioralData ? (
-                      <ul className="list-disc list-inside text-gray-300">
-                        <li>Unusual Typing Patterns: {results.behavioralData.totalUnusualTypingCount}</li>
-                        <li>Tab Switching: {results.behavioralData.totalTabSwitchCount}</li>
-                        <li>Copy/Paste Actions: {results.behavioralData.totalPasteCount}</li>
-                      </ul>
-                    ) : (
-                      <p className="text-gray-300">No behavioral data available.</p>
-                    )}
-                    <div className="mt-6">
-                      <h5 className="text-lg font-medium text-indigo-200 mb-2">Time Overruns:</h5>
-                      {results.behavioralData?.timeOverruns ? (
+                    {behavioralData ? (
+                      <>
                         <ul className="list-disc list-inside text-gray-300">
-                          {Object.entries(results.behavioralData.timeOverruns).map(([section, questions]) => (
-                            <li key={section}>
-                              {section}:
-                              <ul className="list-disc list-inside ml-4">
-                                {Object.entries(questions).map(([questionIndex, overrun]) => (
-                                  <li key={`${section}-${questionIndex}`}>
-                                    Question {Number.parseInt(questionIndex) + 1}:{" "}
-                                    {overrun ? (
-                                      <span className="text-red-400">Time overrun</span>
-                                    ) : (
-                                      <span className="text-green-400">Within time limit</span>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            </li>
-                          ))}
+                          <li>Unusual Typing Patterns: {behavioralData.totalUnusualTypingCount}</li>
+                          <li>Tab Switching: {behavioralData.totalTabSwitchCount}</li>
+                          <li>Copy/Paste Actions: {behavioralData.totalPasteCount}</li>
                         </ul>
-                      ) : (
-                        <p className="text-gray-300">No time overruns recorded.</p>
-                      )}
-                      <p className="mt-4 text-gray-300">
-                        Time Overrun Deductions:{" "}
-                        <span className="text-indigo-400 font-semibold">
-                          {(
-                            Object.values(results.behavioralData?.timeOverruns || {})
-                              .flat()
-                              .filter(Boolean).length * 0.3
-                          ).toFixed(2)}{" "}
-                          stars
-                        </span>
-                      </p>
-                    </div>
+                        <div className="mt-6">
+                          <h5 className="text-lg font-medium text-indigo-200 mb-2">Time Overruns:</h5>
+                          {Object.entries(behavioralData.timeOverruns).length > 0 ? (
+                            <ul className="list-disc list-inside text-gray-300">
+                              {Object.entries(behavioralData.timeOverruns).map(([section, questions]) => (
+                                <li key={section}>
+                                  {section}:
+                                  <ul className="list-disc list-inside ml-4">
+                                    {Object.entries(questions).map(([questionIndex, overrun]) => (
+                                      <li key={`${section}-${questionIndex}`}>
+                                        Question {Number.parseInt(questionIndex) + 1}:{" "}
+                                        {overrun ? (
+                                          <span className="text-red-400">Time overrun</span>
+                                        ) : (
+                                          <span className="text-green-400">Within time limit</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-gray-300">No time overruns recorded.</p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-gray-300">Behavioral data not available.</p>
+                    )}
                     <p className="mt-4 text-gray-300">
                       Total Deductions:{" "}
                       <span className="text-indigo-400 font-semibold">{deductions.toFixed(2)} stars</span>

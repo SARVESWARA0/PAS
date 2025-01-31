@@ -30,7 +30,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
-        <main className="min-h-screen max-w-4xl mx-auto px-4 py-8">{children}</main>
+        <main className="min-h-screen min-w-screen">{children}</main>
       </body>
     </html>
   )
