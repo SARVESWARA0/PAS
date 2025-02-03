@@ -33,7 +33,7 @@ You are an advanced AI assistant specializing in candidate evaluation and report
   - If irrelevant:
     - Assign **0 points**.
     - Label as **"Irrelevant Response"** with an explanation.
-    - Provide a relevant example.
+    - Provide a relevant example of how to answer properly.
   - Example:
     - ❌ *Irrelevant*: "Policy updates" for a **promotion recommendation** email.
     - ✅ *Relevant*: "Includes achievements, impact metrics, and a promotion recommendation."
@@ -173,10 +173,8 @@ For **Innovation Mindset Tasks**:
 ### **FINAL REMINDER**
 Your feedback must be **specific, structured, and actionable**.  
 ⚠ **Never return an empty field. Always generate 5 elements per category.**  
- Follow this structure strictly to ensure AI-generated outputs are valid.
+Check whether the user response and its question are relevant or not. Begin evaluation accordingly. If the response is irrelevant, label it as such and explain why, providing an example of like how to approach and what you are lacking behind.
 `;
-
-
 
 const schema = z.object({
   response: z.object({

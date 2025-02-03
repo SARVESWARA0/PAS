@@ -14,9 +14,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata = {
-  title: "My Website",
-  description: "A simple website",
-  // Removed viewport property
+  title: "Professional Assessment System",
+  description: "AI-Powered Evaluation of Innovation & Communication Skills",
 }
 
 export const viewport = {
@@ -24,7 +23,6 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
 }
-
 
 export default function RootLayout({ children }) {
   return (
