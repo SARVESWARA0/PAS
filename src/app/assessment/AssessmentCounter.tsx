@@ -99,59 +99,64 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
 
   const handleEnd = useCallback(
     (index: number, section: string) => {
-      clearInterval(timerRef.current!)
-      timerRef.current = null
-      const endTime = Date.now()
-      const startTime = timing[index]?.startTime
-      if (startTime) {
-        const timeTaken = ((endTime - startTime) / 60000).toFixed(2)
-        const timeOverrun = Number(timeTaken) > 3
-        setTiming((prev) => ({
-          ...prev,
-          [index]: { ...prev[index], timeTaken: Number(timeTaken) },
-        }))
-        setTimeOverruns((prev) => ({
-          ...prev,
-          [section]: { ...prev[section], [index]: timeOverrun },
-        }))
-        setResponses((prev) => ({
-          ...prev,
-          [section]: {
-            ...prev[section],
-            [index]: { ...prev[section]?.[index], timeTaken: Number(timeTaken), timeOverrun },
-          },
-        }))
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
       }
+
+      const endTime = Date.now()
+      const startTime = timing[index]?.startTime || endTime
+      const timeTaken = ((endTime - startTime) / 1000).toFixed(2) // Convert to seconds
+
+      const timeOverrun = Number(timeTaken) > 180 // More than 3 minutes
+      setTimeOverruns((prev) => ({
+        ...prev,
+        [section]: { ...prev[section], [index]: timeOverrun },
+      }))
+
+      setResponses((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [index]: {
+            ...prev[section]?.[index],
+            timeTaken: Number(timeTaken),
+            timeOverrun,
+          },
+        },
+      }))
     },
     [timing],
   )
 
   const handleStart = useCallback(
     (index: number) => {
-      setTiming((prev) => {
-        if (prev[index] && prev[index].startTime) {
-          return prev
-        }
-        return { ...prev, [index]: { startTime: Date.now(), timeLeft: 180 } }
-      })
-
-      if (!timerRef.current) {
-        timerRef.current = setInterval(() => {
-          setTiming((prev) => {
-            const currentTiming = prev[index]
-            if (!currentTiming || currentTiming.timeLeft! <= 0) {
-              clearInterval(timerRef.current!)
-              timerRef.current = null
-              handleEnd(index, currentSection)
-              return prev
-            }
-            return {
-              ...prev,
-              [index]: { ...currentTiming, timeLeft: currentTiming.timeLeft! - 1 },
-            }
-          })
-        }, 1000)
+      // Stop any existing timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
       }
+
+      setTiming((prev) => ({
+        ...prev,
+        [index]: { startTime: Date.now(), timeLeft: 180 },
+      }))
+
+      timerRef.current = setInterval(() => {
+        setTiming((prev) => {
+          const currentTiming = prev[index]
+          if (!currentTiming || currentTiming.timeLeft! <= 0) {
+            clearInterval(timerRef.current!)
+            timerRef.current = null
+            handleEnd(index, currentSection)
+            return prev
+          }
+          return {
+            ...prev,
+            [index]: { ...currentTiming, timeLeft: currentTiming.timeLeft! - 1 },
+          }
+        })
+      }, 1000)
     },
     [currentSection, handleEnd],
   )
@@ -286,6 +291,7 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
           totalTabSwitchCount: tabSwitchCount,
           totalUnusualTypingCount: unusualTypingCount,
           timeOverruns: timeOverruns,
+          userName: userName,
         },
       }
       console.log("Assessment submitted successfully:", data)
@@ -325,13 +331,10 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
       // Moving from innovation mindset to professional communication
       setCurrentSection("professionalCommunication")
       setCurrentQuestion(0)
-      handleStart(0)
     } else if (currentSection === "professionalCommunication" && currentQuestion === 4) {
       setShowConfirmation(true)
     } else {
-      const nextQuestion = currentQuestion + 1
-      setCurrentQuestion(nextQuestion)
-      handleStart(nextQuestion)
+      setCurrentQuestion((prev) => prev + 1)
     }
 
     // If in professional communication section, mark the corresponding innovation mindset question as completed
@@ -350,7 +353,10 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
 
     const remainingTime = timing[currentQuestion]?.timeLeft || 0
     const timeTaken = 180 - remainingTime
-    setTotalTimeTaken(totalTimeTaken + timeTaken)
+    setTotalTimeTaken((prev) => prev + timeTaken)
+
+    // Start the timer for the next question
+    handleStart(currentQuestion + 1)
   }
 
   useEffect(() => {
@@ -410,13 +416,20 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
   }, [blockCopyPaste])
 
   useEffect(() => {
-    handleStart(currentQuestion)
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+
+    if (!responses[currentSection]?.[currentQuestion]?.completed) {
+      handleStart(currentQuestion)
+    }
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
       }
     }
-  }, [currentQuestion, handleStart])
+  }, [currentQuestion, currentSection, responses])
 
   const currentQuestionData =
     currentSection === "innovationMindset"
@@ -426,13 +439,13 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
   const totalQuestions = 10 // 5 innovation + 5 communication
   const currentQuestionNumber = currentQuestion + 1
 
-  const handleQuestionSelect = (index: number) => {
+ const handleQuestionSelect = (index: number) => {
     if (index <= currentQuestion || (index >= 5 && currentSection === "innovationMindset")) {
       setCurrentSection(index < 5 ? "innovationMindset" : "professionalCommunication")
-      setCurrentQuestion(index % 5)
+      // If in second section (index >= 5), subtract 5 from index to get correct question number
+      setCurrentQuestion(index < 5 ? index+5 : index - 5)
     }
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex">
       <QuestionNavigationBar
@@ -462,7 +475,7 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
               <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
                   <span className="text-sm font-medium text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
-                    Question {currentQuestionNumber} of {totalQuestions}
+                    Question {currentSection === "professionalCommunication" ? currentQuestionNumber + 5 : currentQuestionNumber} of {totalQuestions}
                   </span>
                   <div className="flex items-center text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
                     <Clock className="w-5 h-5 mr-2" />
@@ -497,12 +510,7 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
                       : ""}
                 </p>
 
-                <div className="w-full bg-gray-700 h-2 rounded-full mb-8">
-                  <div
-                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${(currentQuestionNumber / totalQuestions) * 100}%` }}
-                  ></div>
-                </div>
+                 
 
                 <textarea
                   className="w-full p-6 bg-gray-700/80 text-gray-100 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ease-in-out hover:bg-gray-600/80 text-lg resize-none shadow-inner"

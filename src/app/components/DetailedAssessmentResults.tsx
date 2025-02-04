@@ -46,6 +46,7 @@ interface BehavioralData {
       [index: string]: boolean
     }
   }
+  userName:string
 }
 
 interface QuestionAnalysis {
@@ -166,13 +167,13 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
   const router = useRouter()
   const [showFullReport, setShowFullReport] = useState(false)
 
-  const { deductions, adjustedOverallRating, innovationScore, communicationScore, chartData } = useMemo(() => {
+  const { deductions, adjustedOverallRating, innovationScore, communicationScore, chartData,userName } = useMemo(() => {
     const deductions = calculateDeductions(behavioralData)
 
     const innovationScore = results.overallAssessment.innovationScore
     const communicationScore = results.overallAssessment.communicationScore
-
-    const adjustedOverallRating = Math.max(0, (innovationScore + communicationScore) / 2 - deductions)
+    const userName=behavioralData.userName
+    const adjustedOverallRating = Math.max(0, (innovationScore + communicationScore) - deductions)
 
     const chartData = [
       { name: "Innovation", score: innovationScore },
@@ -186,6 +187,7 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
       innovationScore,
       communicationScore,
       chartData,
+      userName
     }
   }, [results, behavioralData])
 
@@ -208,7 +210,7 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
           <div className="grid grid-cols-2 gap-4">
             <div>
               <span className="text-gray-400">Name:</span>
-              <span className="ml-2 text-white">SARVESWARA</span>
+              <span className="ml-2 text-white">{userName}</span>
             </div>
             <div>
               <span className="text-gray-400">Assessment Date:</span>
