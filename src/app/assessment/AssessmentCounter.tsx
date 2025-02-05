@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRight, Clock, Check, AlertCircle, ChevronLeft, Sparkles, Brain, Mail } from "lucide-react"
+import { ChevronRight, Clock, Check, AlertCircle, ChevronLeft, Sparkles, Brain, Mail, Flame } from "lucide-react"
 import LoadingSpinner from "../components/LoadingSpinner"
 import ConfirmationModal from "../components/ConfirmationModal"
 import { detectUnusualTyping } from "../utils/detectUnusualTyping"
-import type { InnovationQuestion, EmailScenario } from "../types/questions"
-import { innovationQuestions, emailScenarios } from "../lib/questions"
+import { selectedScenarios } from "../lib/questions"
 
 interface AssessmentContentProps {
   userName: string
@@ -19,21 +18,19 @@ const QuestionNavigationBar = ({ totalQuestions, currentQuestion, responses, cur
   return (
     <div className="fixed left-0 top-0 h-full w-24 bg-gradient-to-b from-gray-900 to-indigo-900 flex flex-col items-center py-6 border-r border-indigo-500/30">
       <div className="mb-8">
-        {currentSection === "innovationMindset" ? (
+        {currentSection === "Innovation & Innovative Mindset Assessment" ? (
           <Brain className="w-10 h-10 text-indigo-400" />
-        ) : (
+        ) : currentSection === "Written Communication Assessment" ? (
           <Mail className="w-10 h-10 text-indigo-400" />
+        ) : (
+          <Flame className="w-10 h-10 text-indigo-400" />
         )}
       </div>
       <div className="flex flex-col items-center space-y-4 overflow-y-auto no-scrollbar">
         {Array.from({ length: totalQuestions }).map((_, index) => {
           const questionNumber = index + 1
-          const sectionIndex = index >= 5 ? index - 5 : index
-          const section = index >= 5 ? "professionalCommunication" : "innovationMindset"
-          const isCompleted =
-            responses[section]?.[sectionIndex]?.completed ||
-            (section === "innovationMindset" && responses["professionalCommunication"]?.[sectionIndex]?.completed)
-          const isCurrent = currentQuestion === sectionIndex && currentSection === section
+          const isCompleted = responses[selectedScenarios[index].topic]?.[index]?.completed
+          const isCurrent = currentQuestion === index
 
           return (
             <button
@@ -66,7 +63,7 @@ const QuestionNavigationBar = ({ totalQuestions, currentQuestion, responses, cur
   )
 }
 
-export default function AssessmentContent({ userName }: AssessmentContentProps) {
+export default function UpdatedAssessment({ userName }: AssessmentContentProps) {
   const [responses, setResponses] = useState<{
     [key: string]: {
       [key: number]: {
@@ -81,11 +78,11 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
     }
   }>({})
   const [timing, setTiming] = useState(() => ({
-    startTime: Date.now(), // Avoid setting dynamic values
+    startTime: Date.now(),
   }))
 
   const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [currentSection, setCurrentSection] = useState("innovationMindset")
+  const [currentSection, setCurrentSection] = useState(selectedScenarios[0].topic)
   const [totalTimeTaken, setTotalTimeTaken] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [pasteCount, setPasteCount] = useState(0)
@@ -97,87 +94,83 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
 
-  const handleEnd = useCallback(
-    (index: number, section: string) => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
+  const handleEnd = useCallback((index: number, section: string) => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
 
+    setTiming((prev) => {
+      const startTime = prev[index]?.startTime || Date.now()
       const endTime = Date.now()
-      const startTime = timing[index]?.startTime || endTime
-      const timeTaken = ((endTime - startTime) / 1000).toFixed(2) // Convert to seconds
+      const timeTaken = (endTime - startTime) / 1000 // Convert to seconds
 
-      const timeOverrun = Number(timeTaken) > 180 // More than 3 minutes
-      setTimeOverruns((prev) => ({
-        ...prev,
-        [section]: { ...prev[section], [index]: timeOverrun },
+      const timeOverrun = timeTaken > selectedScenarios[index].timing * 60
+      setTimeOverruns((prevOverruns) => ({
+        ...prevOverruns,
+        [section]: { ...prevOverruns[section], [index]: timeOverrun },
       }))
 
-      setResponses((prev) => ({
-        ...prev,
+      setResponses((prevResponses) => ({
+        ...prevResponses,
         [section]: {
-          ...prev[section],
+          ...prevResponses[section],
           [index]: {
-            ...prev[section]?.[index],
-            timeTaken: Number(timeTaken),
+            ...prevResponses[section]?.[index],
+            timeTaken,
             timeOverrun,
           },
         },
       }))
-    },
-    [timing],
-  )
+
+      return {
+        ...prev,
+        [index]: { ...prev[index], timeLeft: 0 },
+      }
+    })
+  }, [])
 
   const handleStart = useCallback(
     (index: number) => {
-      // Stop any existing timer
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
+      if (!selectedScenarios[index] || selectedScenarios[index].timing === undefined) {
+        console.error(`Invalid scenario at index ${index}.`);
+        return;
       }
-
-      setTiming((prev) => ({
-        ...prev,
-        [index]: { startTime: Date.now(), timeLeft: 180 },
-      }))
-
+  
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+  
+      const startTime = Date.now();
+      const timeLeft = selectedScenarios[index].timing * 60;
+  
       timerRef.current = setInterval(() => {
         setTiming((prev) => {
-          const currentTiming = prev[index]
-          if (!currentTiming || currentTiming.timeLeft! <= 0) {
-            clearInterval(timerRef.current!)
-            timerRef.current = null
-            handleEnd(index, currentSection)
-            return prev
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          const newTimeLeft = Math.max(0, timeLeft - elapsed);
+  
+          if (newTimeLeft <= 0) {
+            clearInterval(timerRef.current!);
+            timerRef.current = null;
+            handleEnd(index, currentSection);
           }
+  
           return {
             ...prev,
-            [index]: { ...currentTiming, timeLeft: currentTiming.timeLeft! - 1 },
-          }
-        })
-      }, 1000)
+            [index]: { startTime, timeLeft: newTimeLeft },
+          };
+        });
+      }, 1000);
     },
-    [currentSection, handleEnd],
-  )
+    [currentSection, handleEnd]
+  );
+  
 
   const handleResponse = (section: string, index: number, value: string) => {
     const currentTime = Date.now()
     const startTime = timing[index]?.startTime || currentTime
     const responseTime = (currentTime - startTime) / 1000
-
-    let questionData: { question?: string; subject?: string; context?: string; instructions?: string } = {}
-
-    if (section === "innovationMindset") {
-      questionData = { question: innovationQuestions[index] }
-    } else if (section === "professionalCommunication") {
-      const emailScenario = emailScenarios[index]
-      questionData = {
-        subject: emailScenario.subject,
-        context: emailScenario.context,
-        instructions: emailScenario.instructions,
-      }
-    }
 
     const isUnusualTyping = detectUnusualTyping(value, responseTime)
     if (isUnusualTyping) {
@@ -196,7 +189,6 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
           pasteCount: (prev[section]?.[index]?.pasteCount || 0) as number,
           tabSwitchCount: (prev[section]?.[index]?.tabSwitchCount || 0) as number,
           unusualTypingCount: ((prev[section]?.[index]?.unusualTypingCount || 0) + (isUnusualTyping ? 1 : 0)) as number,
-          ...questionData,
         },
       },
     }))
@@ -223,45 +215,11 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
     setShowConfirmation(false)
     setIsLoading(true)
     try {
-      const innovationMindsetResponses = Object.entries(responses.innovationMindset || {}).reduce(
-        (acc: { [key: string]: any }, [index, data]: [string, any]) => {
-          if (data && data.response) {
-            acc[index] = {
-              ...data,
-              question: innovationQuestions[Number(index)] as unknown as InnovationQuestion,
-              pasteCount: data.pasteCount || 0,
-              tabSwitchCount: data.tabSwitchCount || 0,
-              unusualTypingCount: data.unusualTypingCount || 0,
-            }
-          }
-          return acc
-        },
-        {},
-      )
-
-      const professionalCommunicationResponses = Object.entries(responses.professionalCommunication || {}).reduce(
-        (acc: { [key: string]: any }, [index, data]: [string, any]) => {
-          if (data && data.response) {
-            const emailScenario = (emailScenarios as EmailScenario[])[Number(index)]
-            acc[index] = {
-              ...data,
-              subject: emailScenario.subject,
-              context: emailScenario.context,
-              instructions: emailScenario.instructions,
-              pasteCount: data.pasteCount || 0,
-              tabSwitchCount: data.tabSwitchCount || 0,
-              unusualTypingCount: data.unusualTypingCount || 0,
-            }
-          }
-          return acc
-        },
-        {},
-      )
-
       const payload = {
         userName,
-        innovationMindset: innovationMindsetResponses,
-        professionalCommunication: professionalCommunicationResponses,
+        innovationMindset: {},
+        writtenCommunication: {},
+        fireInBelly: {},
         behavioralData: {
           totalPasteCount: pasteCount,
           totalTabSwitchCount: tabSwitchCount,
@@ -269,6 +227,28 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
           timeOverruns: timeOverruns,
         },
       }
+
+      selectedScenarios.forEach((scenario, index) => {
+        const response = responses[scenario.topic]?.[index]
+        if (response) {
+          const topicKey =
+            scenario.topic === "Innovation & Innovative Mindset Assessment"
+              ? "innovationMindset"
+              : scenario.topic === "Written Communication Assessment"
+                ? "writtenCommunication"
+                : "fireInBelly"
+
+          payload[topicKey][index] = {
+            question: scenario.question,
+            answer: response.response,
+            responseTime: response.responseTime,
+            timeTaken: response.timeTaken,
+            pasteCount: response.pasteCount,
+            tabSwitchCount: response.tabSwitchCount,
+            unusualTypingCount: response.unusualTypingCount,
+          }
+        }
+      })
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -306,14 +286,13 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
   }, [responses, pasteCount, tabSwitchCount, unusualTypingCount, timeOverruns, userName, router])
 
   const handleNext = () => {
-    const currentResponse = responses[currentSection]?.[currentQuestion]?.response || ""
+    const currentResponse = responses[currentSection]?.[currentQuestion]?.response || "";
     if (currentResponse.trim().split(/\s+/).length < 5) {
-      setErrorMessage("Please provide an answer with at least 5 words before moving to the next question.")
-      return
+      setErrorMessage("Please provide an answer with at least 5 words before moving to the next question.");
+      return;
     }
-    setErrorMessage("")
-
-    // Mark the current question as completed
+    setErrorMessage("");
+  
     setResponses((prev) => ({
       ...prev,
       [currentSection]: {
@@ -323,41 +302,23 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
           completed: true,
         },
       },
-    }))
-
-    handleEnd(currentQuestion, currentSection)
-
-    if (currentSection === "innovationMindset" && currentQuestion === 4) {
-      // Moving from innovation mindset to professional communication
-      setCurrentSection("professionalCommunication")
-      setCurrentQuestion(0)
-    } else if (currentSection === "professionalCommunication" && currentQuestion === 4) {
-      setShowConfirmation(true)
+    }));
+  
+    handleEnd(currentQuestion, currentSection);
+  
+    if (currentQuestion < selectedScenarios.length - 1) {
+      setCurrentQuestion((prev) => prev + 1);
+      setCurrentSection(selectedScenarios[currentQuestion + 1].topic);
+      handleStart(currentQuestion + 1);
     } else {
-      setCurrentQuestion((prev) => prev + 1)
+      setShowConfirmation(true);
     }
-
-    // If in professional communication section, mark the corresponding innovation mindset question as completed
-    if (currentSection === "professionalCommunication") {
-      setResponses((prev) => ({
-        ...prev,
-        innovationMindset: {
-          ...prev.innovationMindset,
-          [currentQuestion]: {
-            ...prev.innovationMindset?.[currentQuestion],
-            completed: true,
-          },
-        },
-      }))
-    }
-
-    const remainingTime = timing[currentQuestion]?.timeLeft || 0
-    const timeTaken = 180 - remainingTime
-    setTotalTimeTaken((prev) => prev + timeTaken)
-
-    // Start the timer for the next question
-    handleStart(currentQuestion + 1)
-  }
+  
+    const remainingTime = timing[currentQuestion]?.timeLeft || 0;
+    const timeTaken = selectedScenarios[currentQuestion]?.timing * 60 - remainingTime;
+    setTotalTimeTaken((prev) => prev + timeTaken);
+  };
+  
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -375,13 +336,7 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
         }))
       }
     }
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
-  }, [currentSection, currentQuestion])
 
-  useEffect(() => {
     const handleCopy = () => {
       setPasteCount((prev) => prev + 1)
       setResponses((prev) => ({
@@ -396,8 +351,11 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
       }))
     }
 
+    document.addEventListener("visibilitychange", handleVisibilityChange)
     document.addEventListener("copy", handleCopy)
+
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
       document.removeEventListener("copy", handleCopy)
     }
   }, [currentSection, currentQuestion])
@@ -416,10 +374,6 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
   }, [blockCopyPaste])
 
   useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-    }
-
     if (!responses[currentSection]?.[currentQuestion]?.completed) {
       handleStart(currentQuestion)
     }
@@ -427,30 +381,26 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
+        timerRef.current = null
       }
     }
-  }, [currentQuestion, currentSection, responses])
+  }, [currentQuestion, currentSection, responses, handleStart])
 
-  const currentQuestionData =
-    currentSection === "innovationMindset"
-      ? (innovationQuestions as unknown as InnovationQuestion[])[currentQuestion]
-      : (emailScenarios as EmailScenario[])[currentQuestion]
-
-  const totalQuestions = 10 // 5 innovation + 5 communication
+  const totalQuestions = selectedScenarios.length
   const currentQuestionNumber = currentQuestion + 1
 
- const handleQuestionSelect = (index: number) => {
-    if (index <= currentQuestion || (index >= 5 && currentSection === "innovationMindset")) {
-      setCurrentSection(index < 5 ? "innovationMindset" : "professionalCommunication")
-      // If in second section (index >= 5), subtract 5 from index to get correct question number
-      setCurrentQuestion(index < 5 ? index+5 : index - 5)
+  const handleQuestionSelect = (index: number) => {
+    if (index <= currentQuestion) {
+      setCurrentSection(selectedScenarios[index].topic)
+      setCurrentQuestion(index)
     }
   }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex">
       <QuestionNavigationBar
         totalQuestions={totalQuestions}
-        currentQuestion={currentSection === "professionalCommunication" ? currentQuestion + 5 : currentQuestion}
+        currentQuestion={currentQuestion}
         responses={responses}
         currentSection={currentSection}
         onQuestionSelect={handleQuestionSelect}
@@ -465,17 +415,13 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
                   Welcome, {userName}
                   <Sparkles className="ml-2 w-8 h-8 text-yellow-300" />
                 </h1>
-                <p className="mt-2 text-indigo-100 text-lg relative z-10">
-                  {currentSection === "innovationMindset"
-                    ? "Part A: Innovation Mindset "
-                    : "Part B: Professional Communication"}
-                </p>
+                <p className="mt-2 text-indigo-100 text-lg relative z-10">{currentSection}</p>
               </div>
 
               <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
                   <span className="text-sm font-medium text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
-                    Question {currentSection === "professionalCommunication" ? currentQuestionNumber + 5 : currentQuestionNumber} of {totalQuestions}
+                    Question {currentQuestionNumber} of {totalQuestions}
                   </span>
                   <div className="flex items-center text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
                     <Clock className="w-5 h-5 mr-2" />
@@ -487,30 +433,12 @@ export default function AssessmentContent({ userName }: AssessmentContentProps) 
                 </div>
 
                 <h2 className="text-3xl font-semibold text-indigo-300 mb-6">
-                  {currentSection === "innovationMindset"
-                    ? `Question ${currentQuestionNumber}`
-                    : "subject" in currentQuestionData
-                      ? currentQuestionData.subject
-                      : ""}
+                  {selectedScenarios[currentQuestion].heading}
                 </h2>
 
-                {currentSection === "professionalCommunication" && "context" in currentQuestionData && (
-                  <div className="mb-6 p-6 bg-indigo-900/30 rounded-xl border border-indigo-500/50">
-                    <p className="text-indigo-200">
-                      <strong className="text-white">Context:</strong> {currentQuestionData.context}
-                    </p>
-                  </div>
-                )}
-
                 <p className="text-gray-300 text-lg mb-8 leading-relaxed">
-                  {currentSection === "innovationMindset"
-                    ? String(currentQuestionData)
-                    : "instructions" in currentQuestionData
-                      ? currentQuestionData.instructions
-                      : ""}
+                  {selectedScenarios[currentQuestion].question}
                 </p>
-
-                 
 
                 <textarea
                   className="w-full p-6 bg-gray-700/80 text-gray-100 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ease-in-out hover:bg-gray-600/80 text-lg resize-none shadow-inner"

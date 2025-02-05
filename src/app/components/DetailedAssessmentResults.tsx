@@ -11,10 +11,12 @@ interface AssessmentReportProps {
       overallRating: number
       innovationScore: number
       communicationScore: number
+      fireInBellyScore: number
     }
     detailedAnalysis: {
       innovation: QuestionAnalysis[]
       communication: QuestionAnalysis[]
+      fireInBelly: QuestionAnalysis[]
     }
     behavioralAnalysis?: {
       timeEfficiency?: {
@@ -33,6 +35,10 @@ interface AssessmentReportProps {
         recommendations?: string[]
       }
     }
+    recruitmentSummary: {
+      recommendation: string
+      summary: string
+    }
   }
   behavioralData: BehavioralData | undefined
 }
@@ -46,7 +52,7 @@ interface BehavioralData {
       [index: string]: boolean
     }
   }
-  userName:string
+  userName: string
 }
 
 interface QuestionAnalysis {
@@ -167,29 +173,34 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
   const router = useRouter()
   const [showFullReport, setShowFullReport] = useState(false)
 
-  const { deductions, adjustedOverallRating, innovationScore, communicationScore, chartData,userName } = useMemo(() => {
-    const deductions = calculateDeductions(behavioralData)
+  const { deductions, adjustedOverallRating, innovationScore, communicationScore, chartData, userName } =
+    useMemo(() => {
+      const deductions = calculateDeductions(behavioralData)
 
-    const innovationScore = results.overallAssessment.innovationScore
-    const communicationScore = results.overallAssessment.communicationScore
-    const userName=behavioralData.userName
-    const adjustedOverallRating = Math.max(0, (innovationScore + communicationScore) - deductions)
+      const innovationScore = results.overallAssessment.innovationScore
+      const communicationScore = results.overallAssessment.communicationScore
+      const userName = behavioralData?.userName
+      const adjustedOverallRating = Math.max(
+        0,
+        innovationScore + communicationScore + results.overallAssessment.fireInBellyScore - deductions,
+      )
 
-    const chartData = [
-      { name: "Innovation", score: innovationScore },
-      { name: "Communication", score: communicationScore },
-      { name: "Overall", score: adjustedOverallRating },
-    ]
+      const chartData = [
+        { name: "Innovation", score: innovationScore },
+        { name: "Communication", score: communicationScore },
+        { name: "Fire in Belly", score: results.overallAssessment.fireInBellyScore },
+        { name: "Overall", score: adjustedOverallRating },
+      ]
 
-    return {
-      deductions,
-      adjustedOverallRating,
-      innovationScore,
-      communicationScore,
-      chartData,
-      userName
-    }
-  }, [results, behavioralData])
+      return {
+        deductions,
+        adjustedOverallRating,
+        innovationScore,
+        communicationScore,
+        chartData,
+        userName,
+      }
+    }, [results, behavioralData])
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -201,6 +212,10 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-indigo-900 text-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto p-6 bg-gray-900 shadow-2xl rounded-2xl text-white mt-8 border border-indigo-500/30">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-indigo-300">Thank you for attending the assessment!</h2>
+          <p className="text-xl text-gray-300 mt-2">Here's your detailed report:</p>
+        </div>
         <h1 className="text-4xl font-bold mb-6 text-center bg-gradient-to-r from-indigo-400 to-purple-500 text-transparent bg-clip-text">
           Assessment Report
         </h1>
@@ -225,7 +240,7 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
             <ul className="list-disc list-inside mb-6 text-gray-300">
               <li>
                 Overall Rating:{" "}
-                <span className="text-indigo-400 font-semibold">{adjustedOverallRating.toFixed(2)} ⭐</span> out of 5
+                <span className="text-indigo-400 font-semibold">{adjustedOverallRating.toFixed(2)} ⭐</span> out of 15
               </li>
               <li>
                 Innovation Score: <span className="text-indigo-400 font-semibold">{innovationScore.toFixed(2)}</span>
@@ -235,9 +250,25 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
                 <span className="text-indigo-400 font-semibold">{communicationScore.toFixed(2)}</span>
               </li>
               <li>
+                Fire in Belly Score:{" "}
+                <span className="text-indigo-400 font-semibold">
+                  {results.overallAssessment.fireInBellyScore.toFixed(2)}
+                </span>
+              </li>
+              <li>
                 Behavioral Deductions: <span className="text-indigo-400 font-semibold">{deductions.toFixed(2)}</span>
               </li>
             </ul>
+
+            <h3 className="text-xl font-medium mb-4 mt-6 text-indigo-300">Recruitment Summary:</h3>
+            <div className="bg-gray-800/30 p-4 rounded-lg">
+              <p className="text-gray-300 mb-2">
+                <span className="text-xl font-medium mb-4 mt-6 text-indigo-300">Recommendation:</span> {results.recruitmentSummary.recommendation}
+              </p>
+              <p className="text-gray-300">
+                <span className="text-xl font-medium mb-4 mt-6 text-indigo-300">Summary:</span> {results.recruitmentSummary.summary}
+              </p>
+            </div>
 
             <h3 className="text-xl font-medium mb-4 text-indigo-300">Performance Breakdown:</h3>
             <div className="bg-gray-800 p-4 rounded-lg">
@@ -270,6 +301,17 @@ const AssessmentReport: React.FC<AssessmentReportProps> = ({ results, behavioral
               <AccordionItem title="Communication Assessment">
                 <div className="space-y-6">
                   {results.detailedAnalysis.communication.map((question) => (
+                    <QuestionSection
+                      key={question.questionNumber}
+                      questionData={question}
+                      questionNumber={question.questionNumber}
+                    />
+                  ))}
+                </div>
+              </AccordionItem>
+              <AccordionItem title="Fire in Belly Assessment">
+                <div className="space-y-6">
+                  {results.detailedAnalysis.fireInBelly.map((question) => (
                     <QuestionSection
                       key={question.questionNumber}
                       questionData={question}

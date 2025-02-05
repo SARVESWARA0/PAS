@@ -1,0 +1,233 @@
+{
+  "response": {
+    "overallAssessment": {
+      "innovationScore": 2.1,
+      "communicationScore": 2.2,
+      "overallRating": 4.3
+    },
+    "recruitmentSummary": {
+      "recommendation": "Strongly Recommend",
+      "summary": "The candidate demonstrates exceptional problem-solving abilities and strategic thinking, particularly in digital transformation initiatives. Their innovative approach to process automation and data-driven decision-making stands out. Strong communication skills are evident in their structured responses and stakeholder management examples. They show natural leadership potential and ability to drive change. Their background in both technical implementation and team leadership makes them an excellent fit for senior technical roles. Areas of focus should include documentation practices and metrics-based reporting."
+    },
+    "detailedAnalysis": {
+      "innovation": [
+        {
+          "questionNumber": 1,
+          "keyCompetencies": [
+            "Strategic problem-solving",
+            "Digital transformation expertise",
+            "Data-driven decision making"
+          ],
+          "improvementAreas": [
+            {
+              "point": "Quantitative impact measurement",
+              "example": "Instead of 'significantly improved efficiency', specify: 'Reduced processing time by 65% through implementation of ML-based automation'"
+            }
+          ],
+          "quickRecommendations": [
+            {
+              "recommendation": "Include specific metrics for all improvements",
+              "example": "Add before/after metrics: 'Reduced manual processing from 4 hours to 15 minutes per case'"
+            }
+          ]
+        },
+        {
+          "questionNumber": 2,
+          "keyCompetencies": [
+            "Process optimization",
+            "Cross-functional collaboration",
+            "Technical innovation"
+          ],
+          "improvementAreas": [
+            {
+              "point": "Documentation clarity",
+              "example": "Current: 'Updated system documentation'. Better: 'Created comprehensive API documentation with interactive examples and error handling scenarios'"
+            }
+          ],
+          "quickRecommendations": [
+            {
+              "recommendation": "Enhance technical documentation practices",
+              "example": "Implement automated documentation generation with tools like Swagger for APIs"
+            }
+          ]
+        }
+      ],
+      "communication": [
+        {
+          "questionNumber": 1,
+          "keyCompetencies": [
+            "Stakeholder management",
+            "Clear presentation structure",
+            "Technical translation"
+          ],
+          "improvementAreas": [
+            {
+              "point": "Executive summary skills",
+              "example": "Current: 'Detailed project explanation'. Better: 'Led with key business impacts: $2M savings and 40% efficiency gain'"
+            }
+          ],
+          "quickRecommendations": [
+            {
+              "recommendation": "Start with high-level impact before details",
+              "example": "Begin presentations with '3 key takeaways' before diving into implementation details"
+            }
+          ]
+        },
+        "fireInTheBelly": [
+        {
+          "questionNumber": 1,
+          "keyCompetencies": [
+            "Passion-driven goal setting",
+            "Unwavering commitment",
+            "Resilience in adversity"
+          ],
+          "improvementAreas": [
+            {
+              "point": "Specific examples of persistence",
+              "example": "Instead of 'remained committed,' specify: 'Continued working on the project despite facing three major obstacles'"
+            }
+          ],
+          "quickRecommendations": [
+            {
+              "recommendation": "Include tangible evidence of perseverance",
+              "example": "Add specific instances: 'Completed the project on time, working extra hours after multiple team members fell ill'"
+            }
+          ]
+        }
+    ],
+"fireInTheBelly": [
+        {
+          "questionNumber": 2,
+          "keyCompetencies": [
+            "Goal-oriented focus",
+            "Self-motivation",
+            "Adaptability under pressure"
+          ],
+          "improvementAreas": [
+            {
+              "point": "Detailed documentation of effort",
+              "example": "Instead of 'worked hard on the task,' specify: 'Developed and followed a meticulous plan to achieve the goal despite time constraints'"
+            }
+          ],
+          "quickRecommendations": [
+            {
+              "recommendation": "Highlight specific challenges overcome",
+              "example": "Include details: 'Successfully navigated tight deadlines and limited resources to deliver the project ahead of schedule'"
+            }
+          ]
+        }
+    ],
+
+        {
+          "questionNumber": 2,
+          "keyCompetencies": [
+            "Change management communication",
+            "Training development",
+            "Written documentation"
+          ],
+          "improvementAreas": [
+            {
+              "point": "Audience adaptation",
+              "example": "Current: 'Sent technical specs to business team'. Better: 'Created role-specific guides for technical and business stakeholders'"
+            }
+          ],
+          "quickRecommendations": [
+            {
+              "recommendation": "Develop role-based communication templates",
+              "example": "Create separate documentation versions for developers, business analysts, and executives"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+
+  "response": {
+    "evaluationExamples": [
+      {
+        "scenario": "Technical Leadership Question",
+        "question": "Describe a situation where you led a challenging technical project. What was your approach and what were the outcomes?",
+        "irrelevantResponse for candidate": "I have good communication skills and always arrive at work on time. I also know Python and JavaScript.",
+        "evaluation": {
+          "innovationScore": 0,
+          "communicationScore": 0.1,
+        
+            "detailedAnalysis": {
+              "keyCompetencies":{
+               "Irrelevant Response",
+              }
+            
+            "improvementAreas": [
+              {
+                "point": "irrelevantResponse",
+                "example": "Response fails to address project leadership, challenges faced, or specific outcomes. Instead focuses on general skills and punctuality.",
+              }
+            ],
+            "recommendations": [
+              {
+                "point": "Focus on leadership experience",
+                "example": "Describe a specific project, your leadership actions, and quantifiable results,dont give Irrelevant answers"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "scenario": "Problem-Solving Question",
+        "question": "Tell us about a time when you identified and solved a critical system performance issue.",
+        "irrelevantResponse for candidate": "I think team building is very important. Last month we had a great office party and everyone enjoyed it. The food was excellent.",
+        "evaluation": {
+          "innovationScore": 0,
+          "communicationScore": 0,
+          "detailedAnalysis": {
+            "keyCompetencies": {
+              "Completely Irrelevant",
+              
+              
+            },
+            "improvementAreas": [
+              {
+                "point": "Off-topic response",
+                "example": "Response discusses social events instead of technical problem-solving. No connection to system performance or issue resolution.",
+              }
+            ],
+            "recommendations": [
+              {
+                "point": "Use technical examples",
+                "example": "Describe specific technical issues, your troubleshooting process, and measurable improvements, Here is an example how to approach: I identified that our customer database queries were taking 15+ seconds during peak hours. After analyzing query patterns and execution plans, I implemented database indexing and query optimization, reducing response time to under 200ms. This improved customer satisfaction scores by 30%.""
+              }
+            ]
+          }
+        }
+      },
+      {
+        "scenario": "Innovation Question",
+        "question": "Describe an innovative solution you implemented to improve efficiency in your previous role.",
+        "irrelevantResponse for candidate": "I have 5 years of experience and worked at three different companies. My hobbies include reading and hiking.",
+        "evaluation": {
+          "innovationScore": 0,
+          "communicationScore": 0,
+          "detailedAnalysis": {
+            "keyCompetencies": {
+             "Irrelevant Response",
+              
+              
+            },
+            "improvementAreas": [
+              {
+                "point": "Missing innovation focus",
+                "example": "Response lists work history and personal interests instead of addressing innovation or efficiency improvements."
+              }
+            ],
+            "recommendations": [
+              {
+                "point": "Provide concrete innovation example",
+                "example": "Detail an original solution, implementation process, and quantifiable impact,here is an example how to approach: I developed an automated testing framework using AI that reduced QA time by 60%. The innovation was combining ML for test case generation with automated execution, resulting in 90% test coverage and saving 20 hours per sprint."
+              }
+            ]
+          }
+        }
+      }
+    ],
+  }
