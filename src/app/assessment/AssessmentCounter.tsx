@@ -6,64 +6,27 @@ import { ChevronRight, Clock, Check, AlertCircle, ChevronLeft, Sparkles, Brain, 
 import LoadingSpinner from "../components/LoadingSpinner"
 import ConfirmationModal from "../components/ConfirmationModal"
 import { detectUnusualTyping } from "../utils/detectUnusualTyping"
-import { selectedScenarios } from "../lib/questions"
+import { fetchScenarios } from "../lib/questions"
+import ProgressBar from "../components/ProgressBar"
+import Confetti from "react-confetti"
 
 interface AssessmentContentProps {
   userName: string
 }
 
-const timerRef: { current: NodeJS.Timeout | null } = { current: null }
-
-const QuestionNavigationBar = ({ totalQuestions, currentQuestion, responses, currentSection, onQuestionSelect }) => {
-  return (
-    <div className="fixed left-0 top-0 h-full w-24 bg-gradient-to-b from-gray-900 to-indigo-900 flex flex-col items-center py-6 border-r border-indigo-500/30">
-      <div className="mb-8">
-        {currentSection === "Innovation & Innovative Mindset Assessment" ? (
-          <Brain className="w-10 h-10 text-indigo-400" />
-        ) : currentSection === "Written Communication Assessment" ? (
-          <Mail className="w-10 h-10 text-indigo-400" />
-        ) : (
-          <Flame className="w-10 h-10 text-indigo-400" />
-        )}
-      </div>
-      <div className="flex flex-col items-center space-y-4 overflow-y-auto no-scrollbar">
-        {Array.from({ length: totalQuestions }).map((_, index) => {
-          const questionNumber = index + 1
-          const isCompleted = responses[selectedScenarios[index].topic]?.[index]?.completed
-          const isCurrent = currentQuestion === index
-
-          return (
-            <button
-              key={index}
-              onClick={() => onQuestionSelect(index)}
-              className={`
-                relative w-14 h-14 rounded-full flex items-center justify-center 
-                font-medium text-sm border-2 transition-all duration-300
-                ${
-                  isCompleted
-                    ? "bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/50"
-                    : isCurrent
-                      ? "bg-indigo-900/60 border-indigo-500 text-indigo-300 ring-2 ring-indigo-400 ring-offset-2 ring-offset-gray-900"
-                      : "bg-gray-800/50 border-gray-700 text-gray-400 hover:bg-indigo-800/30 hover:border-indigo-600 hover:text-indigo-300"
-                }
-              `}
-            >
-              {isCompleted ? <Check className="w-6 h-6" /> : questionNumber}
-
-              {isCurrent && (
-                <span className="absolute -right-28 top-1/2 transform -translate-y-1/2 text-indigo-300 text-xs whitespace-nowrap bg-gray-800 px-2 py-1 rounded-md">
-                  Current
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
+interface Scenario {
+  topic: string
+  timer: number
+  Headers: string
+  Question: string
 }
 
+const timerRef: { current: NodeJS.Timeout | null } = { current: null }
+
+
+
 export default function UpdatedAssessment({ userName }: AssessmentContentProps) {
+  const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [responses, setResponses] = useState<{
     [key: string]: {
       [key: number]: {
@@ -82,9 +45,9 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
   }))
 
   const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [currentSection, setCurrentSection] = useState(selectedScenarios[0].topic)
+  const [currentSection, setCurrentSection] = useState("")
   const [totalTimeTaken, setTotalTimeTaken] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [pasteCount, setPasteCount] = useState(0)
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [unusualTypingCount, setUnusualTypingCount] = useState(0)
@@ -93,79 +56,91 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
+  const [showConfetti, setShowConfetti] = useState(false)
 
-  const handleEnd = useCallback((index: number, section: string) => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
+  useEffect(() => {
+    const loadScenarios = async () => {
+      const fetchedScenarios = await fetchScenarios()
+      setScenarios(fetchedScenarios)
+      setCurrentSection(fetchedScenarios[0]?.topic || "")
+      setIsLoading(false)
     }
-
-    setTiming((prev) => {
-      const startTime = prev[index]?.startTime || Date.now()
-      const endTime = Date.now()
-      const timeTaken = (endTime - startTime) / 1000 // Convert to seconds
-
-      const timeOverrun = timeTaken > selectedScenarios[index].timing * 60
-      setTimeOverruns((prevOverruns) => ({
-        ...prevOverruns,
-        [section]: { ...prevOverruns[section], [index]: timeOverrun },
-      }))
-
-      setResponses((prevResponses) => ({
-        ...prevResponses,
-        [section]: {
-          ...prevResponses[section],
-          [index]: {
-            ...prevResponses[section]?.[index],
-            timeTaken,
-            timeOverrun,
-          },
-        },
-      }))
-
-      return {
-        ...prev,
-        [index]: { ...prev[index], timeLeft: 0 },
-      }
-    })
+    loadScenarios()
   }, [])
+
+  const handleEnd = useCallback(
+    (index: number, section: string) => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+
+      setTiming((prev) => {
+        const startTime = prev[index]?.startTime || Date.now()
+        const endTime = Date.now()
+        const timeTaken = (endTime - startTime) / 1000 // Convert to seconds
+
+        const timeOverrun = timeTaken > scenarios[index].timer * 60
+        setTimeOverruns((prevOverruns) => ({
+          ...prevOverruns,
+          [section]: { ...prevOverruns[section], [index]: timeOverrun },
+        }))
+
+        setResponses((prevResponses) => ({
+          ...prevResponses,
+          [section]: {
+            ...prevResponses[section],
+            [index]: {
+              ...prevResponses[section]?.[index],
+              timeTaken,
+              timeOverrun,
+            },
+          },
+        }))
+
+        return {
+          ...prev,
+          [index]: { ...prev[index], timeLeft: 0 },
+        }
+      })
+    },
+    [scenarios],
+  )
 
   const handleStart = useCallback(
     (index: number) => {
-      if (!selectedScenarios[index] || selectedScenarios[index].timing === undefined) {
-        console.error(`Invalid scenario at index ${index}.`);
-        return;
+      if (!scenarios[index] || scenarios[index].timer === undefined) {
+        return
       }
-  
+
       if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+        clearInterval(timerRef.current)
+        timerRef.current = null
       }
-  
-      const startTime = Date.now();
-      const timeLeft = selectedScenarios[index].timing * 60;
-  
+
+      const startTime = Date.now()
+      const timeLeft = scenarios[index].timer * 60
+
       timerRef.current = setInterval(() => {
         setTiming((prev) => {
-          const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          const newTimeLeft = Math.max(0, timeLeft - elapsed);
-  
+          const elapsed = Math.floor((Date.now() - startTime) / 1000)
+          const newTimeLeft = Math.max(0, timeLeft - elapsed)
+
           if (newTimeLeft <= 0) {
-            clearInterval(timerRef.current!);
-            timerRef.current = null;
-            handleEnd(index, currentSection);
+            clearInterval(timerRef.current!)
+            timerRef.current = null
+            handleEnd(index, currentSection)
           }
-  
+
           return {
             ...prev,
             [index]: { startTime, timeLeft: newTimeLeft },
-          };
-        });
-      }, 1000);
+          }
+        })
+      }, 1000)
     },
-    [currentSection, handleEnd]
-  );
-  
+    [currentSection, handleEnd, scenarios],
+  )
 
   const handleResponse = (section: string, index: number, value: string) => {
     const currentTime = Date.now()
@@ -212,14 +187,12 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
   }
 
   const handleSubmit = useCallback(async () => {
-    setShowConfirmation(false)
+    setShowConfetti(true)
     setIsLoading(true)
     try {
       const payload = {
         userName,
-        innovationMindset: {},
-        writtenCommunication: {},
-        fireInBelly: {},
+        responses: {},
         behavioralData: {
           totalPasteCount: pasteCount,
           totalTabSwitchCount: tabSwitchCount,
@@ -228,24 +201,21 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
         },
       }
 
-      selectedScenarios.forEach((scenario, index) => {
+      scenarios.forEach((scenario, index) => {
         const response = responses[scenario.topic]?.[index]
         if (response) {
-          const topicKey =
-            scenario.topic === "Innovation & Innovative Mindset Assessment"
-              ? "innovationMindset"
-              : scenario.topic === "Written Communication Assessment"
-                ? "writtenCommunication"
-                : "fireInBelly"
-
-          payload[topicKey][index] = {
-            question: scenario.question,
-            answer: response.response,
-            responseTime: response.responseTime,
-            timeTaken: response.timeTaken,
-            pasteCount: response.pasteCount,
-            tabSwitchCount: response.tabSwitchCount,
-            unusualTypingCount: response.unusualTypingCount,
+          if (!payload.responses[scenario.topic]) {
+        payload.responses[scenario.topic] = {}
+          }
+          payload.responses[scenario.topic][index] = {
+        headers: scenario.Headers,
+        question: scenario.Question,
+        answer: response.response,
+        responseTime: response.responseTime,
+        timeTaken: response.timeTaken,
+        pasteCount: response.pasteCount,
+        tabSwitchCount: response.tabSwitchCount,
+        unusualTypingCount: response.unusualTypingCount,
           }
         }
       })
@@ -260,39 +230,27 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
       })
 
       if (!res.ok) {
+        setShowConfetti(false)
         throw new Error(`HTTP error! status: ${res.status}`)
       }
 
-      const responseData = await res.json()
-      const data = {
-        ...responseData,
-        behavioralData: {
-          totalPasteCount: pasteCount,
-          totalTabSwitchCount: tabSwitchCount,
-          totalUnusualTypingCount: unusualTypingCount,
-          timeOverruns: timeOverruns,
-          userName: userName,
-        },
-      }
-      console.log("Assessment submitted successfully:", data)
-
-      const encodedData = encodeURIComponent(JSON.stringify(data))
-      router.push(`/report?data=${encodedData}`)
+      console.log("Assessment submitted successfully")
+      router.push("/thank-you")
     } catch (error) {
       console.error("Error submitting assessment:", error)
       setIsLoading(false)
       setErrorMessage("Failed to submit assessment: " + (error as Error).message)
     }
-  }, [responses, pasteCount, tabSwitchCount, unusualTypingCount, timeOverruns, userName, router])
+  }, [responses, pasteCount, tabSwitchCount, unusualTypingCount, timeOverruns, userName, router, scenarios])
 
   const handleNext = () => {
-    const currentResponse = responses[currentSection]?.[currentQuestion]?.response || "";
+    const currentResponse = responses[currentSection]?.[currentQuestion]?.response || ""
     if (currentResponse.trim().split(/\s+/).length < 5) {
-      setErrorMessage("Please provide an answer with at least 5 words before moving to the next question.");
-      return;
+      setErrorMessage("Please provide an answer with at least 5 words before moving to the next question.")
+      return
     }
-    setErrorMessage("");
-  
+    setErrorMessage("")
+
     setResponses((prev) => ({
       ...prev,
       [currentSection]: {
@@ -302,23 +260,22 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
           completed: true,
         },
       },
-    }));
-  
-    handleEnd(currentQuestion, currentSection);
-  
-    if (currentQuestion < selectedScenarios.length - 1) {
-      setCurrentQuestion((prev) => prev + 1);
-      setCurrentSection(selectedScenarios[currentQuestion + 1].topic);
-      handleStart(currentQuestion + 1);
+    }))
+
+    handleEnd(currentQuestion, currentSection)
+
+    if (currentQuestion < scenarios.length - 1) {
+      setCurrentQuestion((prev) => prev + 1)
+      setCurrentSection(scenarios[currentQuestion + 1].topic)
+      handleStart(currentQuestion + 1)
     } else {
-      setShowConfirmation(true);
+      setShowConfirmation(true)
     }
-  
-    const remainingTime = timing[currentQuestion]?.timeLeft || 0;
-    const timeTaken = selectedScenarios[currentQuestion]?.timing * 60 - remainingTime;
-    setTotalTimeTaken((prev) => prev + timeTaken);
-  };
-  
+
+    const remainingTime = timing[currentQuestion]?.timeLeft || 0
+    const timeTaken = scenarios[currentQuestion]?.timer * 60 - remainingTime
+    setTotalTimeTaken((prev) => prev + timeTaken)
+  }
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -386,25 +343,25 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
     }
   }, [currentQuestion, currentSection, responses, handleStart])
 
-  const totalQuestions = selectedScenarios.length
+  const totalQuestions = scenarios.length
   const currentQuestionNumber = currentQuestion + 1
 
   const handleQuestionSelect = (index: number) => {
     if (index <= currentQuestion) {
-      setCurrentSection(selectedScenarios[index].topic)
+      setCurrentSection(scenarios[index].topic)
       setCurrentQuestion(index)
     }
   }
 
+  if (isLoading) {
+    return <LoadingSpinner />
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex">
-      <QuestionNavigationBar
-        totalQuestions={totalQuestions}
-        currentQuestion={currentQuestion}
-        responses={responses}
-        currentSection={currentSection}
-        onQuestionSelect={handleQuestionSelect}
-      />
+      {showConfetti && <Confetti />}
+      
+
       <div className="flex-1 pl-28 min-h-screen overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-12">
           <div className="bg-gray-800/80 backdrop-blur-lg shadow-2xl rounded-3xl overflow-hidden border border-indigo-500/30">
@@ -413,7 +370,7 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
                 <div className="absolute inset-0 bg-pattern opacity-10"></div>
                 <h1 className="text-4xl font-bold tracking-tight relative z-10 flex items-center">
                   Welcome, {userName}
-                  <Sparkles className="ml-2 w-8 h-8 text-yellow-300" />
+                  <Sparkles className="ml-2 w-6 h-6 text-yellow-300" />
                 </h1>
                 <p className="mt-2 text-indigo-100 text-lg relative z-10">{currentSection}</p>
               </div>
@@ -432,13 +389,11 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
                   </div>
                 </div>
 
-                <h2 className="text-3xl font-semibold text-indigo-300 mb-6">
-                  {selectedScenarios[currentQuestion].heading}
-                </h2>
+                <ProgressBar current={currentQuestionNumber} total={totalQuestions} />
 
-                <p className="text-gray-300 text-lg mb-8 leading-relaxed">
-                  {selectedScenarios[currentQuestion].question}
-                </p>
+                <h2 className="text-3xl font-semibold text-indigo-300 mb-6">{scenarios[currentQuestion].Headers}</h2>
+
+                <p className="text-gray-300 text-lg mb-8 leading-relaxed">{scenarios[currentQuestion].Question}</p>
 
                 <textarea
                   className="w-full p-6 bg-gray-700/80 text-gray-100 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ease-in-out hover:bg-gray-600/80 text-lg resize-none shadow-inner"

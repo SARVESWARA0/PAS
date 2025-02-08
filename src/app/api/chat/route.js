@@ -2,7 +2,7 @@
 import { generateObject } from "ai"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { z } from "zod"
-
+import Airtable from 'airtable';
 import {  NextResponse } from "next/server"
 
 const google = createGoogleGenerativeAI({
@@ -120,7 +120,7 @@ Generate a final recruitment recommendation that includes:
    ]
   },
   "redFlags": [
-   "Generic responses not addressing the question",
+   "Generic responses not addressing the question and headers",
    "Personal anecdotes unrelated to the query",
    "Missing technical details when required",
    "Lack of specific examples or metrics",
@@ -134,7 +134,7 @@ Generate a final recruitment recommendation that includes:
 #### **1. RELEVANCE CHECK**
 - **Score**: 0-1.5 points.
 - **Process**:
-  - Check if the response **directly addresses** the question.
+  - Check if the response **directly addresses** the question and headers.
   - If irrelevant:
    - Assign **0 points**.
    - Label as **"Irrelevant Response"** with an explanation.
@@ -550,6 +550,7 @@ The recruitment summary MUST include:
 - ALWAYS calculate and include the Overall Rating as the sum of Innovation,Communication and FireInBelly scores
 - ENSURE the Overall Rating is prominently featured in the recruitment summary and it should be at least 30 - 50 words with clear and proper explanation of why to recruit this person and if the candidate is not eligible for recruitment explain why with clear
 - MAINTAIN consistency between scores and recommendation levels
+- READ both question and header for the particular question and respond accordingly to the prompt mentioned in the heading
 - PROVIDE specific examples to support the overall assessment
 - NEVER exceed the maximum score limits (5 per category, 15.0 total)
 - never exceed the limit of 30-50 words in generating recuritment summary 
@@ -671,19 +672,21 @@ const behavioralSchema = z.object({
 const structureAssessmentData = (rawData) => {
   const structuredData = [];
   
-  const categories = ["innovationMindset", "writtenCommunication", "fireInBelly"];
-  categories.forEach(category => {
-    if (rawData[category]) {
-      Object.entries(rawData[category]).forEach(([index, item]) => {
-        structuredData.push({
-          category,
-          questionNumber: Number(index),
-          question: item?.question || "N/A",
-          answer: item?.answer || "No response provided",
-          
-        });
+  Object.entries(rawData.responses).forEach(([category, questions]) => {
+    Object.entries(questions).forEach(([index, item]) => {
+      structuredData.push({
+        category,
+        questionNumber: Number(index) + 1,
+        headers: item?.headers || "N/A",
+        question: item?.question || "N/A",
+        answer: item?.answer || "No response provided",
+        responseTime: item?.responseTime || "N/A",
+        timeTaken: item?.timeTaken || "N/A",
+        pasteCount: item?.pasteCount || 0,
+        tabSwitchCount: item?.tabSwitchCount || 0,
+        unusualTypingCount: item?.unusualTypingCount || 0,
       });
-    }
+    });
   });
   
   return structuredData;
@@ -692,7 +695,7 @@ const structureAssessmentData = (rawData) => {
 export async function POST(req) {
   try {
     const body = await req.json();
-    console.log("Received assessment data:", body);
+     console.log("Request Body:", body);
     
     if (!body.userName || !body.behavioralData) {
       return new Response(
@@ -706,7 +709,7 @@ export async function POST(req) {
     const processedResponses = structureAssessmentData(body);
     
     const formattedPrompt =`Assessment Responses:\n` +
-      processedResponses.map(response => `Category: ${response.category}\nQuestion ${response.questionNumber}: ${response.question}\nAnswer: ${response.answer}\n`).join("\n");
+      processedResponses.map(response => `Category: ${response.category}\nHeader: ${response.headers}\nQuestion:${response.questionNumber}: ${response.question}\nAnswer: ${response.answer}\n`).join("\n");
     
     console.log("Formatted Prompt:", formattedPrompt);
     
@@ -715,10 +718,40 @@ export async function POST(req) {
       prompt: formattedPrompt,
       system: systemPrompt,
       schema: schema,
-      temperature: 0.4,
+      temperature: 0.3,
       preprocess: preprocessResponse
     });
-    console.log("Generated assessment object:", assessmentObject.response.detailedAnalysis.innovation)
+  const calculateDeductions = () => {
+    let deductions = 0;
+    const { totalTabSwitchCount, totalUnusualTypingCount, totalPasteCount, timeOverruns } = body.behavioralData;
+    
+    if (totalTabSwitchCount > 2) {
+      deductions += Math.min((totalTabSwitchCount - 2) * 0.1, 0.2);
+    }
+  
+    // Deductions for unusual typing patterns
+    if (totalUnusualTypingCount > 4) {
+      deductions += Math.min((totalUnusualTypingCount - 4) * 0.05, 0.2);
+    }
+  
+    // Deductions for copy/paste actions
+    if (totalPasteCount > 3) {
+      deductions += Math.min((totalPasteCount - 3) * 0.1, 0.3);
+    }
+  
+    // Deductions for time overruns
+    let timeOverrunCount = 0;
+    Object.values(timeOverruns).forEach((section) => {
+      Object.values(section).forEach((overrun) => {
+        if (overrun) timeOverrunCount++;
+      });
+    });
+    deductions += Math.min(timeOverrunCount * 0.3, 0.3);
+  
+    return Math.min(deductions, 1); // Cap deductions at 1.0
+  };
+  const deductionPoints=calculateDeductions();
+  assessmentObject.response.overallAssessment.overallscore = Math.max(0, assessmentObject.response.overallAssessment.overallscore - deductionPoints);
     const behavioralInsightsPrompt = `
     Analyze the following behavioral data and provide a detailed structured analysis:
     
@@ -758,8 +791,32 @@ export async function POST(req) {
       behavioralAnalysis: behavioralAnalysis.behavioralAnalysis
     }
     
-    console.log("safe")
-    console.log("Generated assessment object:", finalResponse)
+    
+const base = new Airtable({apiKey:'patyfDcedyFIgbnAE.d453878862966d0a8e6e210e2a57b2056aa6ce62f8d96ea597fc3d033b5a678e'}).base('appBZJKmKN3iViICl');
+
+base('report').create({
+  
+    
+    
+      "Name": body.userName,
+      "overallscore":  assessmentObject.response.overallAssessment.overallscore,
+      "innovationScore": assessmentObject.response.overallAssessment.innovationScore,
+      "fireInBellyScore": assessmentObject.response.overallAssessment.fireInBellyScore,
+      "communicationScore": assessmentObject.response.overallAssessment.communicationScore,
+      "deductionPoints": deductionPoints,
+      "summary": assessmentObject.response.recruitmentSummary.summary,
+      "recommendation": assessmentObject.response.recruitmentSummary.recommendation,
+      "detailedAnalysis": JSON.stringify(assessmentObject.response.detailedAnalysis),
+      "behavioralAnalysis": JSON.stringify(behavioralAnalysis.behavioralAnalysis),
+    }
+  
+, {typecast: true}, function(err, record) {
+  if (err) {
+    console.error(err);
+    return;
+  }
+  console.log(record.getId());
+});
     return NextResponse.json(finalResponse)
   } catch (error) {
     console.error("Error during assessment processing:", error)
