@@ -2,18 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRight, Clock, Check, AlertCircle, ChevronLeft, Sparkles, Brain, Mail, Flame } from "lucide-react"
+import { ChevronRight, Clock, AlertCircle, Sparkles } from "lucide-react"
 import LoadingSpinner from "../components/LoadingSpinner"
 import ConfirmationModal from "../components/ConfirmationModal"
 import { detectUnusualTyping } from "../utils/detectUnusualTyping"
 import { fetchScenarios } from "../lib/questions"
 import ProgressBar from "../components/ProgressBar"
 import Confetti from "react-confetti"
-
-interface AssessmentContentProps {
-  userName: string
-}
-
+import { useAssessmentStore } from "../store/assessmentStore"
+import { motion } from "framer-motion"
 interface Scenario {
   topic: string
   timer: number
@@ -23,9 +20,7 @@ interface Scenario {
 
 const timerRef: { current: NodeJS.Timeout | null } = { current: null }
 
-
-
-export default function UpdatedAssessment({ userName }: AssessmentContentProps) {
+export default function AssessmentContent() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [responses, setResponses] = useState<{
     [key: string]: {
@@ -40,9 +35,7 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
       }
     }
   }>({})
-  const [timing, setTiming] = useState(() => ({
-    startTime: Date.now(),
-  }))
+  const [timing, setTiming] = useState<{ [key: number]: { startTime: number; timeLeft: number } }>({})
 
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [currentSection, setCurrentSection] = useState("")
@@ -57,6 +50,9 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
   const [showConfetti, setShowConfetti] = useState(false)
+  const { recordId, setRecordId } = useAssessmentStore()
+
+  console.log("recordId in AssessmentCounter:", recordId)
 
   useEffect(() => {
     const loadScenarios = async () => {
@@ -160,7 +156,7 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
           ...((prev[section]?.[index] as any) || {}),
           response: value,
           responseTime: responseTime,
-          timeTaken: timing[index]?.timeTaken || 0,
+          timeTaken: (Date.now() - (timing[index]?.startTime || Date.now())) / 1000,
           pasteCount: (prev[section]?.[index]?.pasteCount || 0) as number,
           tabSwitchCount: (prev[section]?.[index]?.tabSwitchCount || 0) as number,
           unusualTypingCount: ((prev[section]?.[index]?.unusualTypingCount || 0) + (isUnusualTyping ? 1 : 0)) as number,
@@ -190,8 +186,9 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
     setShowConfetti(true)
     setIsLoading(true)
     try {
+      const { recordId } = useAssessmentStore.getState();
       const payload = {
-        userName,
+        recordId,
         responses: {},
         behavioralData: {
           totalPasteCount: pasteCount,
@@ -205,17 +202,17 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
         const response = responses[scenario.topic]?.[index]
         if (response) {
           if (!payload.responses[scenario.topic]) {
-        payload.responses[scenario.topic] = {}
+            payload.responses[scenario.topic] = {}
           }
           payload.responses[scenario.topic][index] = {
-        headers: scenario.Headers,
-        question: scenario.Question,
-        answer: response.response,
-        responseTime: response.responseTime,
-        timeTaken: response.timeTaken,
-        pasteCount: response.pasteCount,
-        tabSwitchCount: response.tabSwitchCount,
-        unusualTypingCount: response.unusualTypingCount,
+            headers: scenario.Headers,
+            question: scenario.Question,
+            answer: response.response,
+            responseTime: response.responseTime,
+            timeTaken: response.timeTaken,
+            pasteCount: response.pasteCount,
+            tabSwitchCount: response.tabSwitchCount,
+            unusualTypingCount: response.unusualTypingCount,
           }
         }
       })
@@ -224,7 +221,6 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_ASSESSMENT_TOKEN}`,
         },
         body: JSON.stringify(payload),
       })
@@ -241,7 +237,7 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
       setIsLoading(false)
       setErrorMessage("Failed to submit assessment: " + (error as Error).message)
     }
-  }, [responses, pasteCount, tabSwitchCount, unusualTypingCount, timeOverruns, userName, router, scenarios])
+  }, [responses, pasteCount, tabSwitchCount, unusualTypingCount, timeOverruns, router, scenarios])
 
   const handleNext = () => {
     const currentResponse = responses[currentSection]?.[currentQuestion]?.response || ""
@@ -360,16 +356,20 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex">
       {showConfetti && <Confetti />}
-      
 
       <div className="flex-1 pl-28 min-h-screen overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-12">
-          <div className="bg-gray-800/80 backdrop-blur-lg shadow-2xl rounded-3xl overflow-hidden border border-indigo-500/30">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="bg-gray-800/80 backdrop-blur-lg shadow-2xl rounded-3xl overflow-hidden border border-indigo-500/30"
+          >
             <div className="p-0">
               <div className="px-8 py-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white relative overflow-hidden">
                 <div className="absolute inset-0 bg-pattern opacity-10"></div>
                 <h1 className="text-4xl font-bold tracking-tight relative z-10 flex items-center">
-                  Welcome, {userName}
+                  Assessment
                   <Sparkles className="ml-2 w-6 h-6 text-yellow-300" />
                 </h1>
                 <p className="mt-2 text-indigo-100 text-lg relative z-10">{currentSection}</p>
@@ -391,11 +391,31 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
 
                 <ProgressBar current={currentQuestionNumber} total={totalQuestions} />
 
-                <h2 className="text-3xl font-semibold text-indigo-300 mb-6">{scenarios[currentQuestion].Headers}</h2>
+                <motion.h2
+                  key={currentQuestion}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="text-3xl font-semibold text-indigo-300 mb-6"
+                >
+                  {scenarios[currentQuestion].Headers}
+                </motion.h2>
 
-                <p className="text-gray-300 text-lg mb-8 leading-relaxed">{scenarios[currentQuestion].Question}</p>
+                <motion.p
+                  key={`question-${currentQuestion}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="text-gray-300 text-lg mb-8 leading-relaxed"
+                >
+                  {scenarios[currentQuestion].Question}
+                </motion.p>
 
-                <textarea
+                <motion.textarea
+                  key={`textarea-${currentQuestion}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
                   className="w-full p-6 bg-gray-700/80 text-gray-100 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ease-in-out hover:bg-gray-600/80 text-lg resize-none shadow-inner"
                   rows={8}
                   placeholder="Type your answer here..."
@@ -405,53 +425,43 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
                 />
 
                 {errorMessage && (
-                  <div className="mt-6 text-red-400 bg-red-900/30 p-4 rounded-xl flex items-center">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 text-red-400 bg-red-900/30 p-4 rounded-xl flex items-center"
+                  >
                     <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
                     <span>{errorMessage}</span>
-                  </div>
+                  </motion.div>
                 )}
 
                 <div className="mt-8 space-y-6">
-                  <div className="flex items-center text-yellow-300 bg-yellow-900/30 p-4 rounded-xl">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.6 }}
+                    className="flex items-center text-yellow-300 bg-yellow-900/30 p-4 rounded-xl"
+                  >
                     <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
                     <span>Answer within the time limit for best results</span>
-                  </div>
+                  </motion.div>
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <label htmlFor="blockCopyPaste" className="mr-3 text-indigo-300 cursor-pointer">
-                        Block Copy/Paste
-                      </label>
-                      <input
-                        type="checkbox"
-                        id="blockCopyPaste"
-                        checked={blockCopyPaste}
-                        onChange={(e) => setBlockCopyPaste(e.target.checked)}
-                        className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
-                      />
-                    </div>
                     <div className="flex space-x-4">
-                      {currentQuestion > 0 && (
-                        <button
-                          onClick={() => handleQuestionSelect(currentQuestion - 1)}
-                          className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg font-medium"
-                        >
-                          <ChevronLeft className="mr-2 w-5 h-5" />
-                          Previous
-                        </button>
-                      )}
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={handleNext}
                         className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 flex items-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg font-medium"
                       >
                         {currentQuestionNumber === totalQuestions ? "Submit" : "Next"}
                         <ChevronRight className="ml-2 w-6 h-6" />
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
 
@@ -464,4 +474,6 @@ export default function UpdatedAssessment({ userName }: AssessmentContentProps) 
     </div>
   )
 }
+
+
 

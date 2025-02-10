@@ -1,18 +1,13 @@
 "use server"
 import { generateObject } from "ai"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { z } from "zod"
+import { record, z } from "zod"
 import Airtable from 'airtable';
 import {  NextResponse } from "next/server"
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_API_KEY,
 })
-
-
- 
-
-
 
 const systemPrompt = `
 You are an advanced AI assistant specializing in candidate evaluation and report generation. score them based on innovation,communication and fire in belly competencies, calculate an overall rating,Follow these evaluation guidelines strictly.Read Every Question With Response and Give Answer Accordingly to the Prompt Mentioned In the Heading.
@@ -695,17 +690,13 @@ const structureAssessmentData = (rawData) => {
 export async function POST(req) {
   try {
     const body = await req.json();
-     console.log("Request Body:", body);
-    
-    if (!body.userName || !body.behavioralData) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid request format. Required fields missing."
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+    const recordId = body.recordId;
+     console.log("Request Body:",body);
+     console.log("Record ID:",recordId);
+     if (!recordId) {
+      throw new Error("Record ID is missing from the request body")
     }
-    
+   
     const processedResponses = structureAssessmentData(body);
     
     const formattedPrompt =`Assessment Responses:\n` +
@@ -794,11 +785,13 @@ export async function POST(req) {
     
 const base = new Airtable({apiKey:'patyfDcedyFIgbnAE.d453878862966d0a8e6e210e2a57b2056aa6ce62f8d96ea597fc3d033b5a678e'}).base('appBZJKmKN3iViICl');
 
-base('report').create({
-  
-    
-    
-      "Name": body.userName,
+
+
+await new Promise((resolve, reject) => {
+  base("Candidate").update(
+    recordId,
+    {
+      "Status": "completed",
       "overallscore":  assessmentObject.response.overallAssessment.overallscore,
       "innovationScore": assessmentObject.response.overallAssessment.innovationScore,
       "fireInBellyScore": assessmentObject.response.overallAssessment.fireInBellyScore,
@@ -808,18 +801,26 @@ base('report').create({
       "recommendation": assessmentObject.response.recruitmentSummary.recommendation,
       "detailedAnalysis": JSON.stringify(assessmentObject.response.detailedAnalysis),
       "behavioralAnalysis": JSON.stringify(behavioralAnalysis.behavioralAnalysis),
-    }
-  
-, {typecast: true}, function(err, record) {
-  if (err) {
-    console.error(err);
-    return;
-  }
-  console.log(record.getId());
-});
-    return NextResponse.json(finalResponse)
-  } catch (error) {
-    console.error("Error during assessment processing:", error)
-    return NextResponse.json({ error: "Failed to process the assessment. Please try again." }, { status: 500 })
-  }
+    },
+    (err, record) => {
+      if (err) {
+        console.error("Error updating candidate:", err)
+        reject(err)
+      } else {
+        console.log("Candidate updated successfully")
+        resolve()
+      }
+    },
+  )
+})
+
+return NextResponse.json({ status: "success", message: "Assessment processed successfully" })
+} catch (error) {
+console.error("Error during assessment processing:", error)
+return NextResponse.json(
+  { error: error.message || "Failed to process the assessment. Please try again." },
+  { status: 500 },
+)
 }
+}
+
