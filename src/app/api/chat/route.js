@@ -228,9 +228,11 @@ example(note read this every examples carefully for your reference and give your
 {
   "response": {
     "overallAssessment": {
-      "innovationScore": 2.1,
-      "communicationScore": 2.2,
-      "overallRating": 4.3
+    "overallRating": 11.8,
+      "innovationScore": 4.1,
+      "communicationScore": 4.2,
+      fireInBellyScore: 3.5,
+      
     },
     "recruitmentSummary": {
       "recommendation": "Strongly Recommend",
@@ -691,12 +693,10 @@ export async function POST(req) {
   try {
     const body = await req.json();
     const recordId = body.recordId;
-     console.log("Request Body:",body);
-     console.log("Record ID:",recordId);
      if (!recordId) {
       throw new Error("Record ID is missing from the request body")
     }
-   
+  const totalTime = body.behavioralData.totalTimeTaken+"minutes";
     const processedResponses = structureAssessmentData(body);
     
     const formattedPrompt =`Assessment Responses:\n` +
@@ -783,7 +783,7 @@ export async function POST(req) {
     }
     
     
-const base = new Airtable({apiKey:'patyfDcedyFIgbnAE.d453878862966d0a8e6e210e2a57b2056aa6ce62f8d96ea597fc3d033b5a678e'}).base('appBZJKmKN3iViICl');
+const base = new Airtable({apiKey:process.env.AIRTABLE_API_KEY}).base(process.env.AIRTABLE_BASE_ID);
 
 
 
@@ -801,6 +801,7 @@ await new Promise((resolve, reject) => {
       "recommendation": assessmentObject.response.recruitmentSummary.recommendation,
       "detailedAnalysis": JSON.stringify(assessmentObject.response.detailedAnalysis),
       "behavioralAnalysis": JSON.stringify(behavioralAnalysis.behavioralAnalysis),
+      
     },
     (err, record) => {
       if (err) {

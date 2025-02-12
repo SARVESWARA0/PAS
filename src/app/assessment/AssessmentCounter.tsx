@@ -6,22 +6,16 @@ import { ChevronRight, Clock, AlertCircle, Sparkles } from "lucide-react"
 import LoadingSpinner from "../components/LoadingSpinner"
 import ConfirmationModal from "../components/ConfirmationModal"
 import { detectUnusualTyping } from "../utils/detectUnusualTyping"
-import { fetchScenarios } from "../lib/questions"
 import ProgressBar from "../components/ProgressBar"
 import Confetti from "react-confetti"
 import { useAssessmentStore } from "../store/assessmentStore"
 import { motion } from "framer-motion"
-interface Scenario {
-  topic: string
-  timer: number
-  Headers: string
-  Question: string
-}
 
 const timerRef: { current: NodeJS.Timeout | null } = { current: null }
 
 export default function AssessmentContent() {
-  const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [scenarios, setScenarios] = useState([]);
+
   const [responses, setResponses] = useState<{
     [key: string]: {
       [key: number]: {
@@ -50,19 +44,37 @@ export default function AssessmentContent() {
   const [errorMessage, setErrorMessage] = useState("")
   const router = useRouter()
   const [showConfetti, setShowConfetti] = useState(false)
-  const { recordId, setRecordId } = useAssessmentStore()
 
-  console.log("recordId in AssessmentCounter:", recordId)
+
+
 
   useEffect(() => {
     const loadScenarios = async () => {
-      const fetchedScenarios = await fetchScenarios()
-      setScenarios(fetchedScenarios)
-      setCurrentSection(fetchedScenarios[0]?.topic || "")
-      setIsLoading(false)
-    }
-    loadScenarios()
-  }, [])
+      try {
+        const response = await fetch("/api/fetchScenarios", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch scenarios: ${response.statusText}`);
+        }
+
+        const fetchedScenarios = await response.json();
+        setScenarios(fetchedScenarios);
+        setCurrentSection(fetchedScenarios[0]?.topic || "");
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error fetching scenarios:", error);
+        setIsLoading(false);
+      }
+    };
+
+    loadScenarios();
+  }, []);
+
 
   const handleEnd = useCallback(
     (index: number, section: string) => {
@@ -195,6 +207,7 @@ export default function AssessmentContent() {
           totalTabSwitchCount: tabSwitchCount,
           totalUnusualTypingCount: unusualTypingCount,
           timeOverruns: timeOverruns,
+          totalTimeTaken
         },
       }
 
