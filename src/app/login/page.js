@@ -12,6 +12,7 @@ export default function LoginPage() {
     phone: "",
     email: "",
   })
+  const [phoneError, setPhoneError] = useState("");
   const [colleges, setColleges] = useState([])
   const [departments, setDepartments] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -52,9 +53,26 @@ export default function LoginPage() {
   }, [])
 
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
-  }
+    const { name, value } = e.target;
+
+    if (name === "phone") {
+        // Remove non-numeric characters
+        let phone = value.replace(/\D/g, "");
+
+        // Restrict phone number to 10 digits
+        if (phone.length > 10) {
+            setPhoneError("Phone number must be exactly 10 digits.");
+            return; // Prevent further updates
+        } else {
+            setPhoneError(""); // Clear error when valid
+        }
+
+        setFormData({ ...formData, phone });
+    } else {
+        setFormData({ ...formData, [name]: value });
+    }
+};
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -276,21 +294,23 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
-              Phone Number
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              required
-              pattern="[0-9]{10}"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="Enter your phone number"
-            />
-          </div>
+  <label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
+    Phone Number
+  </label>
+  <input
+    id="phone"
+    name="phone"
+    type="tel"
+    required
+    pattern="[0-9]{10}"
+    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400"
+    value={formData.phone}
+    onChange={handleChange}
+    placeholder="Enter your phone number"
+  />
+  {phoneError && <p className="text-red-500 text-sm">{phoneError}</p>}
+</div>
+
 
           <div className="space-y-1">
             <label htmlFor="email" className="block text-sm font-semibold text-gray-700">

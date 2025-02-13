@@ -694,7 +694,7 @@ export async function POST(req) {
     const body = await req.json();
     const recordId = body.recordId;
      if (!recordId) {
-      throw new Error("Record ID is missing from the request body")
+      throw new Error("Record ID is missing from the request body")  
     }
   const totalTime = body.behavioralData.totalTimeTaken+"minutes";
     const processedResponses = structureAssessmentData(body);
@@ -705,44 +705,56 @@ export async function POST(req) {
     console.log("Formatted Prompt:", formattedPrompt);
     
     const { object: assessmentObject } = await generateObject({
-      model: google("gemini-2.0-flash-exp"),
+      model: google("gemini-2.0-flash-exp"), 
       prompt: formattedPrompt,
       system: systemPrompt,
       schema: schema,
       temperature: 0.3,
       preprocess: preprocessResponse
     });
-  const calculateDeductions = () => {
-    let deductions = 0;
-    const { totalTabSwitchCount, totalUnusualTypingCount, totalPasteCount, timeOverruns } = body.behavioralData;
+    const calculateDeductions = () => {
+      let deductions = 0;
+      const { totalTabSwitchCount, totalUnusualTypingCount, totalPasteCount, timeOverruns } = body.behavioralData;
+      
+      if (totalTabSwitchCount > 2) {
+        deductions += Math.min((totalTabSwitchCount - 2) * 0.1, 0.2);
+      }
     
-    if (totalTabSwitchCount > 2) {
-      deductions += Math.min((totalTabSwitchCount - 2) * 0.1, 0.2);
-    }
-  
-    // Deductions for unusual typing patterns
-    if (totalUnusualTypingCount > 4) {
-      deductions += Math.min((totalUnusualTypingCount - 4) * 0.05, 0.2);
-    }
-  
-    // Deductions for copy/paste actions
-    if (totalPasteCount > 3) {
-      deductions += Math.min((totalPasteCount - 3) * 0.1, 0.3);
-    }
-  
-    // Deductions for time overruns
-    let timeOverrunCount = 0;
-    Object.values(timeOverruns).forEach((section) => {
-      Object.values(section).forEach((overrun) => {
-        if (overrun) timeOverrunCount++;
+      // Deductions for unusual typing patterns
+      if (totalUnusualTypingCount > 4) {
+        deductions += Math.min((totalUnusualTypingCount - 4) * 0.05, 0.2);
+      }
+    
+      // Deductions for copy/paste actions
+      if (totalPasteCount > 3) {
+        deductions += Math.min((totalPasteCount - 3) * 0.1, 0.3);
+      }
+    
+      // Deductions for time overruns
+      let timeOverrunCount = 0;
+      Object.values(timeOverruns).forEach((section) => {
+        Object.values(section).forEach((overrun) => {
+          if (overrun) timeOverrunCount++;
+        });
       });
-    });
-    deductions += Math.min(timeOverrunCount * 0.3, 0.3);
-  
-    return Math.min(deductions, 1); // Cap deductions at 1.0
+      deductions += Math.min(timeOverrunCount * 0.3, 0.3);
+    
+      return Math.min(deductions, 1); // Cap deductions at 1.0
   };
-  const deductionPoints=calculateDeductions();
-  assessmentObject.response.overallAssessment.overallscore = Math.max(0, assessmentObject.response.overallAssessment.overallscore - deductionPoints);
+  
+  // Calculate deduction and round to 2 decimal places using Math.round
+  let deductionPoints = calculateDeductions();
+  deductionPoints = Math.round(deductionPoints * 100) / 100; // ✅ Rounding
+  
+  let overallscore = Math.max(0, assessmentObject.response.overallAssessment.overallscore - deductionPoints);
+  overallscore = Math.round(overallscore * 100) / 100; // ✅ Rounding
+  
+  assessmentObject.response.overallAssessment.overallscore = overallscore;
+  
+  console.log("Deduction Points:", deductionPoints);
+  console.log("Overall Score:", overallscore);
+  assessmentObject.response.overallAssessment.overallscore = overallscore;
+  
     const behavioralInsightsPrompt = `
     Analyze the following behavioral data and provide a detailed structured analysis:
     
