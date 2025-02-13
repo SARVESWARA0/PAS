@@ -15,11 +15,19 @@ const getAirtableRecords = async () => {
       .eachPage(
         (records, fetchNextPage) => {
           records.forEach((record) => {
-            const fields = record.fields;
-            if (fields.topic && fields.timer && fields.Headers && fields.Question) {
+            const { fields } = record;
+            // Filter so that only rows with status 'published' and all required fields are added
+            if (
+              fields.status === "published" &&
+              fields.topic &&
+              fields.timer &&
+              fields.header &&
+              fields.question
+            ) {
               allRecords.push(fields);
             }
           });
+          
           fetchNextPage();
         },
         (err) => {
@@ -27,7 +35,7 @@ const getAirtableRecords = async () => {
           else resolve(allRecords);
         }
       );
-  });
+  });    
 };
 
 const getRandomScenarios = (scenarios) => {
@@ -57,6 +65,7 @@ export async function POST(request) {
     }
 
     const selectedScenarios = getRandomScenarios(scenarios);
+    console.log("Selected scenarios:", selectedScenarios);
     return NextResponse.json(selectedScenarios);
   } catch (error) {
     console.error("Error fetching Airtable records:", error);

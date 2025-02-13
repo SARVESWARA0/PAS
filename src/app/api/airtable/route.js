@@ -77,12 +77,12 @@ async function createCandidate(data) {
   return new Promise((resolve, reject) => {
     base("Candidate").create(
       {
-        Name: data.name,
-        College: data.college,
-        Department: data.department,
-        phone_number: data.phone,
-        Email: data.email,
-        Status: "ongoing",
+        name: data.name,
+        college: data.college,
+        department: data.department,
+        phoneNumber: data.phone,
+        email: data.email,
+        status: "ongoing",
       },
       (err, record) => {
         if (err) {

@@ -200,34 +200,35 @@ export default function AssessmentContent() {
     try {
       const { recordId } = useAssessmentStore.getState();
       const payload = {
-        recordId,
-        responses: {},
-        behavioralData: {
-          totalPasteCount: pasteCount,
-          totalTabSwitchCount: tabSwitchCount,
-          totalUnusualTypingCount: unusualTypingCount,
-          timeOverruns: timeOverruns,
-          totalTimeTaken
-        },
+      recordId,
+      responses: {},
+      behavioralData: {
+        totalPasteCount: pasteCount,
+        totalTabSwitchCount: tabSwitchCount,
+        totalUnusualTypingCount: unusualTypingCount,
+        timeOverruns: timeOverruns,
+        totalTimeTaken
+      },
       }
 
       scenarios.forEach((scenario, index) => {
-        const response = responses[scenario.topic]?.[index]
-        if (response) {
-          if (!payload.responses[scenario.topic]) {
-            payload.responses[scenario.topic] = {}
-          }
-          payload.responses[scenario.topic][index] = {
-            headers: scenario.Headers,
-            question: scenario.Question,
-            answer: response.response,
-            responseTime: response.responseTime,
-            timeTaken: response.timeTaken,
-            pasteCount: response.pasteCount,
-            tabSwitchCount: response.tabSwitchCount,
-            unusualTypingCount: response.unusualTypingCount,
-          }
+      const response = responses[scenario.topic]?.[index]
+      if (response) {
+        if (!payload.responses[scenario.topic]) {
+        payload.responses[scenario.topic] = {}
         }
+        payload.responses[scenario.topic][index] = {
+        id: scenario.id,
+        headers: scenario.header,
+        question: scenario.question,
+        answer: response.response,
+        responseTime: response.responseTime,
+        timeTaken: response.timeTaken,
+        pasteCount: response.pasteCount,
+        tabSwitchCount: response.tabSwitchCount,
+        unusualTypingCount: response.unusualTypingCount,
+        }
+      }
       })
 
       const res = await fetch("/api/chat", {
@@ -411,7 +412,7 @@ export default function AssessmentContent() {
                 transition={{ duration: 0.5 }}
                 className="text-3xl font-semibold text-indigo-300 mb-6"
               >
-                {scenarios[currentQuestion].Headers}
+                {scenarios[currentQuestion].header}
               </motion.h2>
 
               <motion.p
@@ -421,7 +422,7 @@ export default function AssessmentContent() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="text-gray-300 text-lg mb-8 leading-relaxed"
               >
-                {scenarios[currentQuestion].Question}
+                {scenarios[currentQuestion].question}
               </motion.p>
 
               <motion.textarea

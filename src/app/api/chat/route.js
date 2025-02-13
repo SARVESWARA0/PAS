@@ -693,16 +693,15 @@ export async function POST(req) {
   try {
     const body = await req.json();
     const recordId = body.recordId;
-     if (!recordId) {
+    if (!recordId) {
       throw new Error("Record ID is missing from the request body")  
     }
-  const totalTime = body.behavioralData.totalTimeTaken+"minutes";
+ 
     const processedResponses = structureAssessmentData(body);
     
     const formattedPrompt =`Assessment Responses:\n` +
       processedResponses.map(response => `Category: ${response.category}\nHeader: ${response.headers}\nQuestion:${response.questionNumber}: ${response.question}\nAnswer: ${response.answer}\n`).join("\n");
-    
-    console.log("Formatted Prompt:", formattedPrompt);
+      console.log("Formatted Prompt:", formattedPrompt);
     
     const { object: assessmentObject } = await generateObject({
       model: google("gemini-2.0-flash-exp"), 
@@ -789,13 +788,53 @@ export async function POST(req) {
       prompt: behavioralInsightsPrompt
     })
 
-    const finalResponse = {
-      ...assessmentObject.response,
-      behavioralAnalysis: behavioralAnalysis.behavioralAnalysis
-    }
     
     
 const base = new Airtable({apiKey:process.env.AIRTABLE_API_KEY}).base(process.env.AIRTABLE_BASE_ID);
+const cleanedPayload = [];
+
+// Keep track of the overall question index across all topics
+let globalQuestionIndex = 0;
+
+Object.entries(body.responses).forEach(([topic, questions]) => {
+  // Convert questions object/array to array of entries for processing
+  Object.values(questions).forEach((item) => {
+    // Combine all detailed analysis reports into a single array
+    const allReports = [
+      ...assessmentObject.response.detailedAnalysis.innovation.map(report => ({
+        ...report,
+        
+      })),
+      ...assessmentObject.response.detailedAnalysis.communication.map(report => ({
+        ...report,
+        
+      })),
+      ...assessmentObject.response.detailedAnalysis.fireInBelly.map(report => ({
+        ...report,
+        
+      }))
+    ];
+
+    // Sort all reports by question number
+    const sortedReports = allReports.sort((a, b) => a.questionNumber - b.questionNumber);
+
+    // Get the corresponding report for this question using the global index
+    const report = sortedReports[globalQuestionIndex] || {};
+
+    // Add the item to the array with the specified structure
+    cleanedPayload.push({
+      topic: topic,
+      headers: item.headers,
+      question: item.question,
+      response: item.answer,
+      report: report
+    });
+
+    // Increment the global question counter
+    globalQuestionIndex++;
+  });
+});
+
 
 
 
@@ -803,15 +842,15 @@ await new Promise((resolve, reject) => {
   base("Candidate").update(
     recordId,
     {
-      "Status": "completed",
-      "overallscore":  assessmentObject.response.overallAssessment.overallscore,
+      "status": "completed",
+      "overallScore":  assessmentObject.response.overallAssessment.overallscore,
       "innovationScore": assessmentObject.response.overallAssessment.innovationScore,
       "fireInBellyScore": assessmentObject.response.overallAssessment.fireInBellyScore,
       "communicationScore": assessmentObject.response.overallAssessment.communicationScore,
       "deductionPoints": deductionPoints,
       "summary": assessmentObject.response.recruitmentSummary.summary,
       "recommendation": assessmentObject.response.recruitmentSummary.recommendation,
-      "detailedAnalysis": JSON.stringify(assessmentObject.response.detailedAnalysis),
+      "detailedAnalysis": JSON.stringify(cleanedPayload),
       "behavioralAnalysis": JSON.stringify(behavioralAnalysis.behavioralAnalysis),
       
     },
