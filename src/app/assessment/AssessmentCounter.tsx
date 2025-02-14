@@ -38,7 +38,7 @@ export default function AssessmentContent() {
   const [pasteCount, setPasteCount] = useState(0)
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [unusualTypingCount, setUnusualTypingCount] = useState(0)
-  const [blockCopyPaste, setBlockCopyPaste] = useState(false)
+  const [blockCopyPaste, setBlockCopyPaste] = useState(true)
   const [timeOverruns, setTimeOverruns] = useState<{ [key: string]: { [key: number]: boolean } }>({})
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")

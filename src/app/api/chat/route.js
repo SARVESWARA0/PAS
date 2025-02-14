@@ -754,38 +754,43 @@ export async function POST(req) {
   assessmentObject.response.overallAssessment.overallscore = overallscore;
   
   const behavioralInsightsPrompt = `
-  Analyze the following behavioral data and provide a detailed structured analysis:
-  
+  Analyze the following behavioral data and provide a detailed, structured analysis:
+
   Behavioral Metrics:
   - Unusual Typing Patterns: ${body.behavioralData.totalUnusualTypingCount}
   - Tab Switching: ${body.behavioralData.totalTabSwitchCount}
   - Copy/Paste Actions: ${body.behavioralData.totalPasteCount}
-  - Time Overrun: ${body.behavioralData.timeOverrun }
+  - Time Overrun: ${body.behavioralData.timeOverrun}
 
-  Please provide:
+  Please provide insights under the following categories:
+
   1. Time Efficiency Analysis:
-     - Rate the overall efficiency
-     - List specific time-related observations
-     - Describe the impact on assessment quality
-  
-  2. Response Pattern Analysis:
-     - Identify consistent patterns
-     - Note any irregularities
-     - List potential concerns if any
-  
+     - Provide a rating of overall efficiency.
+     - List specific observations related to time management.
+     - Explain the impact of these behaviors on assessment quality.
+
+  2. Response Patterns Analysis:
+     - Identify consistent behavioral patterns.
+     - Highlight any irregularities observed.
+     - Note potential concerns, if any.
+
   3. Interaction Analysis:
-     - Provide an overview of interaction style
-     - List key observed behaviors
-     - Suggest improvements or recommendations
-  
-  Format the response according to the provided schema structure.
-  REMEMBER: In the analysis the header should have space between words folow as like schema but give spaces (example: in schema i gaveinteractionAnalysis its wrong change it to Interaction Analysis,responsePatterns->Response Patterns)simply give the every keys in the report to title case.
-  `
+     - Summarize the user's interaction style.
+     - List key observed behaviors.
+     - Provide actionable recommendations for improvement.
+
+  **Formatting Guidelines:**
+  - Ensure that section headers follow Title Case formatting (e.g., "Interaction Analysis" instead of "interactionAnalysis").
+  - Maintain clarity and professionalism in the response and dont use not professional words like undefined .
+  - Structure the analysis strictly according to the provided schema.
+`;
+
    console.log(behavioralInsightsPrompt)
     const { object: behavioralAnalysis } = await generateObject({
       model: google("gemini-2.0-flash-exp"),
       schema: behavioralSchema,
-      prompt: behavioralInsightsPrompt
+      prompt: behavioralInsightsPrompt,
+      temperature:0.3
     })
 
     
