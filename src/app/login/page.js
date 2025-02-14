@@ -94,7 +94,9 @@ export default function LoginPage() {
     }
   }
 
-  const filteredColleges = colleges.filter((college) => college.toLowerCase().includes(collegeSearch.toLowerCase()))
+  const filteredColleges = colleges.filter((college) =>
+    college.toLowerCase().includes(collegeSearch.toLowerCase()),
+  )
 
   const filteredDepartments = departments.filter((department) =>
     department.toLowerCase().includes(departmentSearch.toLowerCase()),
@@ -223,6 +225,7 @@ export default function LoginPage() {
                             className="mt-2 w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             onClick={() => {
                               setCustomCollege(true)
+                              setFormData((prev) => ({ ...prev, college: collegeSearch }))
                               setShowCollegeDropdown(false)
                             }}
                           >
@@ -310,6 +313,7 @@ export default function LoginPage() {
                             className="mt-2 w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             onClick={() => {
                               setCustomDepartment(true)
+                              setFormData((prev) => ({ ...prev, department: departmentSearch }))
                               setShowDepartmentDropdown(false)
                             }}
                           >
@@ -391,4 +395,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
