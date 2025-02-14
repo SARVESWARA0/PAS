@@ -79,7 +79,7 @@ Base recommendations on the Overall Rating (out of 15.0):
 - Some concerning gaps
 - Development needs identified
 
-"Do Not Recommend" (Overall Rating < 0 to 4.9/15.0):
+"Not Recommended" (Overall Rating < 0 to 4.9/15.0):
 - Weak overall performance
 - Innovation Score: Typically < 1.0/5
 - Communication Score: Typically < 1.0/5
@@ -93,13 +93,12 @@ Generate a final recruitment recommendation that includes:
   - "Strongly Recommend"
   - "Recommend"
   - "Consider with Reservations"
-  - "Do Not Recommend"
+  - "Not Recommended"
 
 2. **Summary Paragraph** (30-50 characters):
   Must include:
   - Overall assessment of candidate's potential
   - Key strengths and areas of concern
-  - Specific examples from their responses
   - Clear justification for the recommendation
   - Connection between scores and hiring decision
 
@@ -217,7 +216,7 @@ For each of the **5 questions**, generate:
 ✅ **NEVER exceed the maximum length for any field.**
 ✅ **Use clear, structured, and non-repetitive explanations.**
  ✅and their might a chance the canditate use the precious or irrelavent reponse  say about in clearly in the quickrecommendations and areas to improve 
- 
+
 
 ---
 
@@ -567,7 +566,7 @@ const schema = z.object({
         "Strongly Recommend",
         "Recommend",
         "Consider with Reservations",
-        "Do Not Recommend"
+        "Not Recommended"
       ]),
       summary: z.string(),
     }),
@@ -754,34 +753,35 @@ export async function POST(req) {
   console.log("Overall Score:", overallscore);
   assessmentObject.response.overallAssessment.overallscore = overallscore;
   
-    const behavioralInsightsPrompt = `
-    Analyze the following behavioral data and provide a detailed structured analysis:
-    
-    Behavioral Metrics:
-    - Unusual Typing Patterns: ${body.behavioralData.totalUnusualTypingCount}
-    - Tab Switching: ${body.behavioralData.totalTabSwitchCount}
-    - Copy/Paste Actions: ${body.behavioralData.totalPasteCount}
-    - Time Overrun: ${body.behavioralData.timeOverrun }
+  const behavioralInsightsPrompt = `
+  Analyze the following behavioral data and provide a detailed structured analysis:
+  
+  Behavioral Metrics:
+  - Unusual Typing Patterns: ${body.behavioralData.totalUnusualTypingCount}
+  - Tab Switching: ${body.behavioralData.totalTabSwitchCount}
+  - Copy/Paste Actions: ${body.behavioralData.totalPasteCount}
+  - Time Overrun: ${body.behavioralData.timeOverrun }
 
-    Please provide:
-    1. Time Efficiency Analysis:
-       - Rate the overall efficiency
-       - List specific time-related observations
-       - Describe the impact on assessment quality
-    
-    2. Response Pattern Analysis:
-       - Identify consistent patterns
-       - Note any irregularities
-       - List potential concerns if any
-    
-    3. Interaction Analysis:
-       - Provide an overview of interaction style
-       - List key observed behaviors
-       - Suggest improvements or recommendations
-    
-    Format the response according to the provided schema structure.
-    `
-
+  Please provide:
+  1. Time Efficiency Analysis:
+     - Rate the overall efficiency
+     - List specific time-related observations
+     - Describe the impact on assessment quality
+  
+  2. Response Pattern Analysis:
+     - Identify consistent patterns
+     - Note any irregularities
+     - List potential concerns if any
+  
+  3. Interaction Analysis:
+     - Provide an overview of interaction style
+     - List key observed behaviors
+     - Suggest improvements or recommendations
+  
+  Format the response according to the provided schema structure.
+  REMEMBER: In the analysis the header should have space between words folow as like schema but give spaces (example: in schema i gaveinteractionAnalysis its wrong change it to Interaction Analysis,responsePatterns->Response Patterns)simply give the every keys in the report to title case.
+  `
+   console.log(behavioralInsightsPrompt)
     const { object: behavioralAnalysis } = await generateObject({
       model: google("gemini-2.0-flash-exp"),
       schema: behavioralSchema,

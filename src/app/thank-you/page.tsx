@@ -1,7 +1,16 @@
+"use client";
 import React from 'react';
+import { useEffect } from 'react';
 import { CheckCircle, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function ThankYouPage() {
+  const router = useRouter();
+  useEffect(() => {
+    // Simulating a delay for loading effect
+    const timer = setTimeout(() => router.push("./"), 7500);
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex items-center justify-center p-4">
       <div className="relative bg-gray-800/80 backdrop-blur-lg shadow-2xl rounded-3xl overflow-hidden border border-indigo-500/30 p-8 max-w-md w-full text-center">

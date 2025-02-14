@@ -181,4 +181,30 @@
     @apply text-lg;
   }
 }
+/* Width and height of the scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 6px;
+}
+
+/* Track (background) */
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #3165de;
+  border-radius: 10px;
+}
+body {
+  overflow-x: hidden;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
 
