@@ -49,8 +49,8 @@ async function fetchData() {
     const colleges = new Set();
     const departments = new Set();
 
-    base("college")
-      .select({ maxRecords: 100, view: "Grid view" })
+    base("College")
+      .select({ view: "Grid view" })
       .eachPage(
         (records, fetchNextPage) => {
           records.forEach((record) => {
