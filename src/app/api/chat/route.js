@@ -21,6 +21,22 @@ Respond Accordingly to the Evalution Guidelines For the Question and Answer 
 -read every questions too with the their answer(the questions will be given above to the answer) of it and evaluate and give deatiledAnalysis and its components accordingly
 
 ### **SCORING FRAMEWORK**
+0.Every score points you provide must be for an reason not simply giving points for the sake of it 
+for example
+Category: Written Communication
+Header: Email Persuasion
+Question:1: Write an email to a dissatisfied customer who has complained about poor service.
+Your goal is to acknowledge their concerns and convince them to continue using your
+services
+
+Answer: this is a dummy response of 1 or aAS D SDF ASD GFFD GFD 
+
+
+Category: Written Communication
+Header: Press Release Writing
+Question:2: You are launching a new product that helps businesses automate recruitment. Write a short press release announcing the launch.    
+Answer: this is a dummy response of 2
+but the innovation scoring is 0.4,so give 0 scores for these kind of response.
 1. **Innovation Score**: Must be within **0-5** (total, across **2 questions**, each **0-2.5**).
 2. **Communication Score**: Must be within **0-5** (total, across **2 questions**, each **0-2.5**).
 3. **fireInBelly Score**: Must be within **0-5** (total, across **2 questions**, each **0-2.5**).
@@ -34,6 +50,7 @@ Respond Accordingly to the Evalution Guidelines For the Question and Answer 
 ---
 
 "evaluationGuidelines": {
+note each point you provide must be for an reason not simply giving points for the sake of it and dont when consider the response which looks compeletly irrelavent and giving dummy response for the question give zero.
   "scoringIrrelevantResponses": {
    "innovationScore": {
     "0 points": "Completely irrelevant or off-topic response",
@@ -48,6 +65,48 @@ Respond Accordingly to the Evalution Guidelines For the Question and Answer 
     "0 points": "Completely irrelevant or off-topic response",
    
     "0.2 points": "Clarity of Goals and Constructive Feedback"
+take the below as irrelavent and dummy response
+Category: Written Communication
+Header: Email Persuasion
+Question:1: Write an email to a dissatisfied customer who has complained about poor service.
+Your goal is to acknowledge their concerns and convince them to continue using your
+services
+
+Answer: this is a dummy response of 1
+
+
+Category: Written Communication
+Header: Press Release Writing
+Question:2: You are launching a new product that helps businesses automate recruitment. Write a short press release announcing the launch.    
+Answer: this is a dummy response of 2
+
+Category: Innovation
+Header: Tech-Driven Change
+Question:3: How could AI be used to make public transport more efficient without adding more buses or trains?
+Answer: this is a dummy response of  3
+
+Category: Innovation
+Header: Efficiency Boosting
+Question:4: How would you redesign the office workspace to make employees more productive and engaged?
+Answer: this is a dummy response of 4
+
+Category: Fire In Belly
+Header: Passion & Work Ethic
+Question:5: Describe a time when you worked tirelessly on something because you were deeply passionate about it.
+Answer: this is a dummy response of 5
+
+Category: Fire In Belly
+Header: Surpassing Expectations
+Question:6: Tell us about a time you delivered results that went beyond what was expected of you. How did you achieve it?
+Answer: this is a dummy response of 6
+
+scores:  {
+  overallscore: 1,
+  innovationScore: 0.4,
+  communicationScore: 0.4,
+  fireInBellyScore: 0.4
+}
+  see the above examples its compeletly irrelavent in these cases give zero for every scoring 
    },
 
    "RECRUITMENT RECOMMENDATION PART":{
@@ -502,7 +561,10 @@ The recruitment summary MUST include:
 ---
 
 ### **FINAL REMINDER**
-- before diving in into the response evaluation check wether user responded relavent to the question, if not give 0 for that question 
+- First you should check whether the user response is relavent to the question or not if not give 0 for that question
+take this example:
+ * user might give dummy response for the question 1 and 2  which is 1st topic you should give zero scoring for first topic and give the feedback in the detailedAnalysis
+
 -const detailedAnalysis(Array must contain exactly 2 element(s)) = {
   innovation: [
     {
@@ -703,7 +765,7 @@ export async function POST(req) {
       console.log("Formatted Prompt:", formattedPrompt);
     
     const { object: assessmentObject } = await generateObject({
-      model: google("gemini-2.0-flash-exp"), 
+      model: google("gemini-2.0-flash"), 
       prompt: formattedPrompt,
       system: systemPrompt,
       schema: schema,
@@ -783,11 +845,12 @@ export async function POST(req) {
   - Ensure that section headers follow Title Case formatting (e.g., "Interaction Analysis" instead of "interactionAnalysis").
   - Maintain clarity and professionalism in the response and dont use not professional words like undefined .
   - Structure the analysis strictly according to the provided schema.
+  Ignore the time-overrun if it was not observed in the given prompt.
 `;
 
    console.log(behavioralInsightsPrompt)
     const { object: behavioralAnalysis } = await generateObject({
-      model: google("gemini-2.0-flash-exp"),
+      model: google("gemini-2.0-flash"),
       schema: behavioralSchema,
       prompt: behavioralInsightsPrompt,
       temperature:0.3
@@ -841,8 +904,8 @@ Object.entries(body.responses).forEach(([topic, questions]) => {
 });
 
 
-
-
+console.log("scores: ",assessmentObject.response.overallAssessment)
+console.log("Cleaned Payload:", JSON.stringify(cleanedPayload));
 await new Promise((resolve, reject) => {
   base("Candidate").update(
     recordId,
