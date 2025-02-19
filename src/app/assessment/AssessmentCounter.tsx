@@ -14,8 +14,7 @@ import { motion } from "framer-motion"
 const timerRef: { current: NodeJS.Timeout | null } = { current: null }
 
 export default function AssessmentContent() {
-  const [scenarios, setScenarios] = useState([]);
-
+  const [scenarios, setScenarios] = useState([])
   const [responses, setResponses] = useState<{
     [key: string]: {
       [key: number]: {
@@ -30,7 +29,6 @@ export default function AssessmentContent() {
     }
   }>({})
   const [timing, setTiming] = useState<{ [key: number]: { startTime: number; timeLeft: number } }>({})
-
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [currentSection, setCurrentSection] = useState("")
   const [totalTimeTaken, setTotalTimeTaken] = useState(0)
@@ -45,9 +43,6 @@ export default function AssessmentContent() {
   const router = useRouter()
   const [showConfetti, setShowConfetti] = useState(false)
 
-
-
-
   useEffect(() => {
     const loadScenarios = async () => {
       try {
@@ -56,25 +51,24 @@ export default function AssessmentContent() {
           headers: {
             "Content-Type": "application/json",
           },
-        });
+        })
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch scenarios: ${response.statusText}`);
+          throw new Error(`Failed to fetch scenarios: ${response.statusText} `)
         }
 
-        const fetchedScenarios = await response.json();
-        setScenarios(fetchedScenarios);
-        setCurrentSection(fetchedScenarios[0]?.topic || "");
-        setIsLoading(false);
+        const fetchedScenarios = await response.json()
+        setScenarios(fetchedScenarios)
+        setCurrentSection(fetchedScenarios[0]?.topic || "")
+        setIsLoading(false)
       } catch (error) {
-        console.error("Error fetching scenarios:", error);
-        setIsLoading(false);
+        console.error("Error fetching scenarios:", error)
+        setIsLoading(false)
       }
-    };
+    }
 
-    loadScenarios();
-  }, []);
-
+    loadScenarios()
+  }, [])
 
   const handleEnd = useCallback(
     (index: number, section: string) => {
@@ -117,22 +111,20 @@ export default function AssessmentContent() {
 
   const handleStart = useCallback(
     (index: number) => {
-      if (!scenarios[index] || scenarios[index].timer === undefined) {
+      // Don't start if timer is already running or if question is invalid
+      if (!scenarios[index] || scenarios[index].timer === undefined || timerRef.current) {
         return
       }
 
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-
-      const startTime = Date.now()
-      const timeLeft = scenarios[index].timer * 60
+      const startTime = timing[index]?.startTime || Date.now()
+      const totalTime = scenarios[index].timer * 60
+      const elapsed = timing[index]?.startTime ? (Date.now() - timing[index].startTime) / 1000 : 0
+      const timeLeft = Math.max(0, totalTime - elapsed)
 
       timerRef.current = setInterval(() => {
         setTiming((prev) => {
-          const elapsed = Math.floor((Date.now() - startTime) / 1000)
-          const newTimeLeft = Math.max(0, timeLeft - elapsed)
+          const currentElapsed = Math.floor((Date.now() - startTime) / 1000)
+          const newTimeLeft = Math.max(0, totalTime - currentElapsed)
 
           if (newTimeLeft <= 0) {
             clearInterval(timerRef.current!)
@@ -147,7 +139,7 @@ export default function AssessmentContent() {
         })
       }, 1000)
     },
-    [currentSection, handleEnd, scenarios],
+    [currentSection, handleEnd, scenarios, timing],
   )
 
   const handleResponse = (section: string, index: number, value: string) => {
@@ -168,7 +160,7 @@ export default function AssessmentContent() {
           ...((prev[section]?.[index] as any) || {}),
           response: value,
           responseTime: responseTime,
-          timeTaken: (Date.now() - (timing[index]?.startTime || Date.now())) / 1000,
+          timeTaken: (currentTime - startTime) / 1000,
           pasteCount: (prev[section]?.[index]?.pasteCount || 0) as number,
           tabSwitchCount: (prev[section]?.[index]?.tabSwitchCount || 0) as number,
           unusualTypingCount: ((prev[section]?.[index]?.unusualTypingCount || 0) + (isUnusualTyping ? 1 : 0)) as number,
@@ -198,37 +190,37 @@ export default function AssessmentContent() {
     setShowConfetti(true)
     setIsLoading(true)
     try {
-      const { recordId } = useAssessmentStore.getState();
+      const { recordId } = useAssessmentStore.getState()
       const payload = {
-      recordId,
-      responses: {},
-      behavioralData: {
-        totalPasteCount: pasteCount,
-        totalTabSwitchCount: tabSwitchCount,
-        totalUnusualTypingCount: unusualTypingCount,
-        timeOverruns: timeOverruns,
-        totalTimeTaken
-      },
+        recordId,
+        responses: {},
+        behavioralData: {
+          totalPasteCount: pasteCount,
+          totalTabSwitchCount: tabSwitchCount,
+          totalUnusualTypingCount: unusualTypingCount,
+          timeOverruns: timeOverruns,
+          totalTimeTaken,
+        },
       }
 
       scenarios.forEach((scenario, index) => {
-      const response = responses[scenario.topic]?.[index]
-      if (response) {
-        if (!payload.responses[scenario.topic]) {
-        payload.responses[scenario.topic] = {}
+        const response = responses[scenario.topic]?.[index]
+        if (response) {
+          if (!payload.responses[scenario.topic]) {
+            payload.responses[scenario.topic] = {}
+          }
+          payload.responses[scenario.topic][index] = {
+            id: scenario.id,
+            headers: scenario.header,
+            question: scenario.question,
+            answer: response.response,
+            responseTime: response.responseTime,
+            timeTaken: response.timeTaken,
+            pasteCount: response.pasteCount,
+            tabSwitchCount: response.tabSwitchCount,
+            unusualTypingCount: response.unusualTypingCount,
+          }
         }
-        payload.responses[scenario.topic][index] = {
-        id: scenario.id,
-        headers: scenario.header,
-        question: scenario.question,
-        answer: response.response,
-        responseTime: response.responseTime,
-        timeTaken: response.timeTaken,
-        pasteCount: response.pasteCount,
-        tabSwitchCount: response.tabSwitchCount,
-        unusualTypingCount: response.unusualTypingCount,
-        }
-      }
       })
 
       const res = await fetch("/api/chat", {
@@ -241,7 +233,7 @@ export default function AssessmentContent() {
 
       if (!res.ok) {
         setShowConfetti(false)
-        throw new Error(`HTTP error! status: ${res.status}`)
+        throw new Error(`HTTP error! status: ${res.status} `)
       }
 
       console.log("Assessment submitted successfully")
@@ -277,7 +269,6 @@ export default function AssessmentContent() {
     if (currentQuestion < scenarios.length - 1) {
       setCurrentQuestion((prev) => prev + 1)
       setCurrentSection(scenarios[currentQuestion + 1].topic)
-      handleStart(currentQuestion + 1)
     } else {
       setShowConfirmation(true)
     }
@@ -304,26 +295,9 @@ export default function AssessmentContent() {
       }
     }
 
-    const handleCopy = () => {
-      setPasteCount((prev) => prev + 1)
-      setResponses((prev) => ({
-        ...prev,
-        [currentSection]: {
-          ...prev[currentSection],
-          [currentQuestion]: {
-            ...((prev[currentSection]?.[currentQuestion] as any) || {}),
-            pasteCount: ((prev[currentSection]?.[currentQuestion]?.pasteCount || 0) as number) + 1,
-          },
-        },
-      }))
-    }
-
     document.addEventListener("visibilitychange", handleVisibilityChange)
-    document.addEventListener("copy", handleCopy)
-
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
-      document.removeEventListener("copy", handleCopy)
     }
   }, [currentSection, currentQuestion])
 
@@ -340,8 +314,9 @@ export default function AssessmentContent() {
     }
   }, [blockCopyPaste])
 
+  // Modified useEffect for timer initialization
   useEffect(() => {
-    if (!responses[currentSection]?.[currentQuestion]?.completed) {
+    if (!responses[currentSection]?.[currentQuestion]?.completed && !timerRef.current) {
       handleStart(currentQuestion)
     }
 
@@ -351,17 +326,10 @@ export default function AssessmentContent() {
         timerRef.current = null
       }
     }
-  }, [currentQuestion, currentSection, responses, handleStart])
+  }, [currentQuestion, currentSection]) // Removed responses and handleStart from dependencies
 
   const totalQuestions = scenarios.length
   const currentQuestionNumber = currentQuestion + 1
-
-  const handleQuestionSelect = (index: number) => {
-    if (index <= currentQuestion) {
-      setCurrentSection(scenarios[index].topic)
-      setCurrentQuestion(index)
-    }
-  }
 
   if (isLoading) {
     return <LoadingSpinner />
@@ -381,96 +349,96 @@ export default function AssessmentContent() {
           >
             <div className="p-0">
               <div className="px-8 py-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white relative overflow-hidden">
-              <div className="absolute inset-0 bg-pattern opacity-10"></div>
-              <h1 className="text-4xl font-bold tracking-tight relative z-10 flex items-center">
-                Assessment
-                <Sparkles className="ml-2 w-6 h-6 text-yellow-300" />
-              </h1>
-              <p className="mt-2 text-indigo-100 text-lg relative z-10">{currentSection}</p>
+                <div className="absolute inset-0 bg-pattern opacity-10"></div>
+                <h1 className="text-4xl font-bold tracking-tight relative z-10 flex items-center">
+                  Assessment
+                  <Sparkles className="ml-2 w-6 h-6 text-yellow-300" />
+                </h1>
+                <p className="mt-2 text-indigo-100 text-lg relative z-10">{currentSection}</p>
               </div>
 
               <div className="p-8">
-              <div className="flex items-center justify-between mb-8">
-                <span className="text-sm font-medium text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
-                Question {currentQuestionNumber} of {totalQuestions}
-                </span>
-                <div className="flex items-center text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
-                <Clock className="w-5 h-5 mr-2" />
-                <span className="font-mono text-lg">
-                  {Math.floor(timing[currentQuestion]?.timeLeft! / 60)}:
-                  {(timing[currentQuestion]?.timeLeft! % 60).toString().padStart(2, "0")}
-                </span>
+                <div className="flex items-center justify-between mb-8">
+                  <span className="text-sm font-medium text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
+                    Question {currentQuestionNumber} of {totalQuestions}
+                  </span>
+                  <div className="flex items-center text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
+                    <Clock className="w-5 h-5 mr-2" />
+                    <span className="font-mono text-lg">
+                      {Math.floor(timing[currentQuestion]?.timeLeft! / 60)}:
+                      {(timing[currentQuestion]?.timeLeft! % 60).toString().padStart(2, "0")}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <ProgressBar current={currentQuestionNumber} total={totalQuestions} />
+                <ProgressBar current={currentQuestionNumber} total={totalQuestions} />
 
-              <motion.h2
-                key={currentQuestion}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="text-3xl font-semibold text-indigo-300 mb-6"
-              >
-                {scenarios[currentQuestion].header}
-              </motion.h2>
-
-              <motion.p
-                key={`question-${currentQuestion}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="text-gray-300 text-lg mb-8 leading-relaxed"
-              >
-                {scenarios[currentQuestion].question}
-              </motion.p>
-
-              <motion.textarea
-                key={`textarea-${currentQuestion}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                className="w-full p-6 bg-gray-700/80 text-gray-100 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ease-in-out hover:bg-gray-600/80 text-lg resize-none shadow-inner"
-                rows={8}
-                placeholder="Type your answer here..."
-                onChange={(e) => handleResponse(currentSection, currentQuestion, e.target.value)}
-                onPaste={handleCopyPaste}
-                value={responses[currentSection]?.[currentQuestion]?.response || ""}
-              />
-
-              {errorMessage && (
-                <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-6 text-red-400 bg-red-900/30 p-4 rounded-xl flex items-center"
+                <motion.h2
+                  key={currentQuestion}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="text-3xl font-semibold text-indigo-300 mb-6"
                 >
-                <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                <span>{errorMessage}</span>
-                </motion.div>
-              )}
+                  {scenarios[currentQuestion].header}
+                </motion.h2>
 
-              <div className="mt-8 space-y-6">
-                <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.6 }}
-                className="flex items-center text-yellow-300 bg-yellow-900/30 p-4 rounded-xl"
+                <motion.p
+                  key={`question - ${currentQuestion} `}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="text-gray-300 text-lg mb-8 leading-relaxed"
                 >
-                <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                <span>Answer within the time limit for best results</span>
-                </motion.div>
-                <div className="flex justify-end items-center">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleNext}
-                  className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 flex items-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg font-medium"
-                >
-                  {currentQuestionNumber === totalQuestions ? "Submit" : "Next"}
-                  <ChevronRight className="ml-2 w-6 h-6" />
-                </motion.button>
+                  {scenarios[currentQuestion].question}
+                </motion.p>
+
+                <motion.textarea
+                  key={`textarea - ${currentQuestion} `}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                  className="w-full p-6 bg-gray-700/80 text-gray-100 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ease-in-out hover:bg-gray-600/80 text-lg resize-none shadow-inner"
+                  rows={8}
+                  placeholder="Type your answer here..."
+                  onChange={(e) => handleResponse(currentSection, currentQuestion, e.target.value)}
+                  onPaste={handleCopyPaste}
+                  value={responses[currentSection]?.[currentQuestion]?.response || ""}
+                />
+
+                {errorMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 text-red-400 bg-red-900/30 p-4 rounded-xl flex items-center"
+                  >
+                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+                    <span>{errorMessage}</span>
+                  </motion.div>
+                )}
+
+                <div className="mt-8 space-y-6">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.6 }}
+                    className="flex items-center text-yellow-300 bg-yellow-900/30 p-4 rounded-xl"
+                  >
+                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+                    <span>Answer within the time limit for best results</span>
+                  </motion.div>
+                  <div className="flex justify-end items-center">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleNext}
+                      className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 flex items-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg font-medium"
+                    >
+                      {currentQuestionNumber === totalQuestions ? "Submit" : "Next"}
+                      <ChevronRight className="ml-2 w-6 h-6" />
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
               </div>
             </div>
           </motion.div>
@@ -486,6 +454,3 @@ export default function AssessmentContent() {
     </div>
   )
 }
-
-
-

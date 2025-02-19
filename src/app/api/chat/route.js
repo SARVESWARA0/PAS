@@ -549,7 +549,7 @@ The recruitment summary MUST include:
 - READ both question and header for the particular question and respond accordingly to the prompt mentioned in the heading
 - PROVIDE specific examples to support the overall assessment
 - NEVER exceed the maximum score limits (5 per category, 15.0 total)
-- never exceed the limit of 30-50 words in generating recuritment summary 
+- never exceed the limit of 30-50 words in generating recuritment summary
 `;
 
 
