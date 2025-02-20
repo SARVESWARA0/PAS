@@ -15,13 +15,14 @@ import { useAssessmentStore } from "../store/assessmentStore"
 const AssessmentContent = () => {
   const router = useRouter()
   const timerRef = useRef(null)
-  const [scenarios, setScenarios] = useState([])
+  
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [blockCopyPaste, setBlockCopyPaste] = useState(false)
   const loadingTimeoutRef = useRef(null)
+  const scenariosInitializedRef = useRef(false)
 
   const {
     recordId,
@@ -29,11 +30,13 @@ const AssessmentContent = () => {
     currentSection,
     responses,
     timing,
+    scenarios,
     setRecordId,
     setCurrentQuestion,
     setCurrentSection,
     setResponses,
     setTiming,
+    setScenarios,
     totalTimeTaken,
     pasteCount,
     tabSwitchCount,
@@ -47,6 +50,7 @@ const AssessmentContent = () => {
     hasStarted,
     startAssessment,
     resetAssessment,
+    completeAssessment,
   } = useAssessmentStore()
 
 
@@ -58,43 +62,50 @@ const AssessmentContent = () => {
           setErrorMessage("Loading is taking longer than expected. Please refresh the page.")
           setIsLoading(false)
         }, 10000)
-  
-        // Check if we already have scenarios and assessment has started
-        if (scenarios.length > 0) {
+    
+        // Check if we already have scenarios in the store and if they've been initialized
+        if (scenarios && scenarios.length > 0 && hasStarted) {
+          console.log("Using scenarios from store:", scenarios.length)
           setIsLoading(false)
           clearTimeout(loadingTimeoutRef.current)
           return
         }
-  
-        // Only fetch new scenarios if we don't have any stored
-        const response = await fetch("/api/fetchScenarios", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          cache: 'no-store'
-        })
-  
-        if (!response.ok) {
-          throw new Error(`Failed to fetch scenarios: ${response.statusText}`)
+    
+        // Only fetch new scenarios if scenarios array is empty
+        if (!scenarios || scenarios.length === 0) {
+          console.log("Fetching scenarios from API")
+          const response = await fetch("/api/fetchScenarios", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: 'no-store'
+          })
+      
+          if (!response.ok) {
+            throw new Error(`Failed to fetch scenarios: ${response.statusText}`)
+          }
+      
+          const fetchedScenarios = await response.json()
+          
+          if (!fetchedScenarios?.length) {
+            throw new Error("No scenarios received")
+          }
+      
+          // Save scenarios to the store
+          setScenarios(fetchedScenarios)
+          scenariosInitializedRef.current = true
         }
-  
-        const fetchedScenarios = await response.json()
-        
-        if (!fetchedScenarios?.length) {
-          throw new Error("No scenarios received")
-        }
-  
-        // Save scenarios to store
-        setScenarios(fetchedScenarios)
-  
+    
         // Initialize assessment if not started
-        if (!hasStarted) {
+        if (!hasStarted && !scenariosInitializedRef.current) {
+          const scenariosToUse = scenarios.length > 0 ? scenarios : []
           const newRecordId = `assessment-${Date.now()}`
           setRecordId(newRecordId)
           setCurrentQuestion(0)
-          setCurrentSection(fetchedScenarios[0]?.topic || "")
+          setCurrentSection(scenariosToUse[0]?.topic || "")
           startAssessment()
+          scenariosInitializedRef.current = true
         }
-  
+    
       } catch (error) {
         console.error("Error loading scenarios:", error)
         setErrorMessage(error.message || "Failed to load assessment. Please try again.")
@@ -103,28 +114,16 @@ const AssessmentContent = () => {
         clearTimeout(loadingTimeoutRef.current)
       }
     }
-  
-    // Only load scenarios if we don't have any or if assessment hasn't started
-    if (!scenarios.length || !hasStarted) {
-      loadScenarios()
-    }
-  
+    
+    loadScenarios()
+    
     return () => {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
     }
-  }, [scenarios.length, hasStarted, setScenarios, setRecordId, setCurrentQuestion, setCurrentSection, startAssessment])
-
-  // Clear loading state if component unmounts
-  useEffect(() => {
-    return () => {
-      setIsLoading(false)
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current)
-      }
-    }
-  }, [])
+  }, [hasStarted, setRecordId, setCurrentQuestion, setCurrentSection, startAssessment, setScenarios, scenarios])
+  
 
 
   const handleStart = useCallback(
@@ -142,6 +141,20 @@ const AssessmentContent = () => {
           ...prev,
           [index]: { startTime, timeLeft: totalTime },
         }))
+      } else if (timing[index].timeLeft > 0) {
+        // Resume from previous state
+        const currentTime = Date.now()
+        const elapsedSinceLastUpdate = Math.floor((currentTime - timing[index].lastUpdateTime || timing[index].startTime) / 1000)
+        const updatedTimeLeft = Math.max(0, timing[index].timeLeft - elapsedSinceLastUpdate)
+        
+        setTiming((prev) => ({
+          ...prev,
+          [index]: { 
+            ...prev[index],
+            timeLeft: updatedTimeLeft,
+            lastUpdateTime: currentTime
+          },
+        }))
       }
 
       timerRef.current = setInterval(() => {
@@ -149,9 +162,8 @@ const AssessmentContent = () => {
           if (!prev[index]) return prev;
           
           const currentTime = Date.now()
-          const elapsed = Math.floor((currentTime - prev[index].startTime) / 1000)
-          const totalTime = scenarios[index].timer * 60
-          const newTimeLeft = Math.max(0, totalTime - elapsed)
+          const elapsed = Math.floor((currentTime - prev[index].lastUpdateTime || prev[index].startTime) / 1000)
+          const newTimeLeft = Math.max(0, prev[index].timeLeft - elapsed)
 
           if (newTimeLeft <= 0) {
             clearInterval(timerRef.current)
@@ -161,7 +173,11 @@ const AssessmentContent = () => {
 
           return {
             ...prev,
-            [index]: { ...prev[index], timeLeft: newTimeLeft },
+            [index]: { 
+              ...prev[index], 
+              timeLeft: newTimeLeft,
+              lastUpdateTime: currentTime 
+            },
           }
         })
       }, 1000)
@@ -182,8 +198,11 @@ const AssessmentContent = () => {
       }
 
       setTiming((prev) => {
-        const timeTaken = scenarios[index].timer * 60 - (prev[index]?.timeLeft || 0)
-        const timeOverrun = timeTaken > scenarios[index].timer * 60
+        if (!prev[index]) return prev;
+        
+        const initialTime = scenarios[index].timer * 60;
+        const timeTaken = initialTime - (prev[index]?.timeLeft || 0);
+        const timeOverrun = timeTaken > initialTime;
 
         setResponses((prevResponses) => ({
           ...prevResponses,
@@ -197,9 +216,10 @@ const AssessmentContent = () => {
           },
         }))
 
+        // Keep timing data but mark as completed
         return {
           ...prev,
-          [index]: { ...prev[index], timeLeft: 0 },
+          [index]: { ...prev[index], isCompleted: true },
         }
       })
     },
@@ -215,7 +235,7 @@ const AssessmentContent = () => {
         
         setTiming((prev) => ({
           ...prev,
-          [index]: { startTime, timeLeft: totalTime },
+          [index]: { startTime, timeLeft: totalTime, lastUpdateTime: startTime },
         }))
       }
 
@@ -313,20 +333,8 @@ const AssessmentContent = () => {
         setShowConfetti(false)
         throw new Error(`HTTP error! status: ${res.status}`)
       }
-
       
-      
-      // Reset the zustand store to initial state
-      setRecordId("");
-      setCurrentQuestion(0);
-      setCurrentSection("");
-      setResponses({});
-      setTiming({});
-      setTotalTimeTaken(0);
-      setPasteCount(0);
-      setTabSwitchCount(0);
-      setUnusualTypingCount(0);
-      setTimeOverruns({});
+      resetAssessment()
       completeAssessment()
       console.log("Assessment submitted successfully")
       router.push("/thank-you")
@@ -335,7 +343,7 @@ const AssessmentContent = () => {
       setIsLoading(false)
       setErrorMessage("Failed to submit assessment: " + error.message)
     }
-  }, [
+  },  [
     recordId,
     pasteCount,
     tabSwitchCount,
@@ -345,16 +353,8 @@ const AssessmentContent = () => {
     scenarios,
     responses,
     router,
-    setRecordId,
-    setCurrentQuestion,
-    setCurrentSection,
-    setResponses,
-    setTiming,
-    setTotalTimeTaken,
-    setPasteCount,
-    setTabSwitchCount,
-    setUnusualTypingCount,
-    setTimeOverruns
+    resetAssessment,
+    completeAssessment
   ])
   
   const handleNext = useCallback(() => {
@@ -453,7 +453,7 @@ const AssessmentContent = () => {
     const currentScenario = scenarios[currentQuestion];
     if (!currentScenario) return;
     
-    const isCompleted = responses[currentSection]?.[currentQuestion]?.completed;
+    const isCompleted = timing[currentQuestion]?.isCompleted || responses[currentSection]?.[currentQuestion]?.completed;
     const timerAlreadyRunning = timerRef.current !== null;
     
     if (!isCompleted && !timerAlreadyRunning) {
@@ -466,7 +466,7 @@ const AssessmentContent = () => {
         timerRef.current = null;
       }
     };
-  }, [scenarios, currentQuestion, currentSection, responses, handleStart]);
+  }, [scenarios, currentQuestion, currentSection, responses, timing, handleStart]);
 
   // Safety check - if no scenarios or currentQuestion is invalid, show a loading state
   if (isLoading || !scenarios.length) {
