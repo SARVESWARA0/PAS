@@ -93,7 +93,7 @@ export default function LandingPage() {
             <h2 className="text-4xl font-bold text-white mb-6">Begin Your Assessment Journey</h2>
             <div className="flex items-center justify-center gap-3">
               <Clock className="h-6 w-6 text-amber-400" />
-              <p className="text-blue-200 text-xl">60-minute comprehensive evaluation</p>
+              <p className="text-blue-200 text-xl">30-minute comprehensive evaluation</p>
             </div>
           </div>
 
