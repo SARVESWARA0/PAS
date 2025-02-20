@@ -757,7 +757,7 @@ export async function POST(req) {
     if (!recordId) {
       throw new Error("Record ID is missing from the request body")  
     }
- 
+    console.log(body)
     const processedResponses = structureAssessmentData(body);
     
     const formattedPrompt =`Assessment Responses:\n` +

@@ -1,14 +1,43 @@
-"use client"
+"use client";
 
-import { useRouter } from "next/navigation"
-import { ArrowRight, Star, Clock, Brain, Mail, Shield, Sparkles,Flame } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Star, Clock, Brain, Mail, Shield, Flame } from "lucide-react";
+import { useAssessmentStore } from "./store/assessmentStore"; 
 
 export default function LandingPage() {
-  const router = useRouter()
+  const router = useRouter();
+  const [keyInput, setKeyInput] = useState("");
+  const [error, setError] = useState("");
+  const resetRequested = useAssessmentStore((state) => state.resetRequested);
 
-  const handleStartAssessment = () => {
-    router.push("/login")
-  }
+  // Redirect to thank-you page if resetRequested is true
+  useEffect(() => {
+    if (resetRequested) {
+      router.push("/thank-you");
+    }
+  }, [resetRequested, router]);
+
+  const handleKeyValidation = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!keyInput.trim()) {
+      setError("Please enter an assessment key.");
+      return;
+    }
+    const res = await fetch("/api/validateKey", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: keyInput }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      // Redirect to your login page (which you already have)
+      router.push("/login");
+    } else {
+      setError(data.message || "Invalid key");
+    }
+  };
 
   const features = [
     {
@@ -23,22 +52,20 @@ export default function LandingPage() {
     },
     {
       icon: Flame,
-      title: "fire in belly",
-      description: "10-mins assessment of your passion and drive",
+      title: "Fire in the Belly",
+      description: "10-minute assessment of your passion and drive",
     },
     {
       icon: Star,
       title: "Comprehensive Scoring",
       description: "5-star rating system across multiple competencies",
     },
-    
     {
       icon: Shield,
       title: "Real-time Monitoring",
       description: "Secure assessment environment with behavioral analysis",
     },
-    
-  ]
+  ];
 
   return (
     <div className="min-h-screen w-screen bg-gradient-to-br from-blue-950 via-indigo-950 to-blue-900 relative overflow-hidden">
@@ -53,14 +80,9 @@ export default function LandingPage() {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <nav className="flex justify-between items-center mb-16">
           <div className="flex items-center space-x-2">
-            
+            {/* Add your logo or branding here */}
           </div>
-          <button
-            onClick={handleStartAssessment}
-            className="bg-gradient-to-r from-amber-500 to-amber-700 text-white px-6 py-2 rounded-full font-semibold hover:from-amber-600 hover:to-amber-800 transition duration-300 transform hover:scale-105 shadow-lg"
-          >
-            Get Started
-          </button>
+          
         </nav>
 
         <div className="text-center mb-20">
@@ -88,7 +110,10 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div className="max-w-2xl mx-auto bg-white/5 rounded-3xl shadow-2xl p-12 backdrop-blur-sm border border-white/10 transform hover:scale-105 transition duration-300 hover:border-amber-500/30">
+        <div
+          id="key-form"
+          className="max-w-2xl mx-auto bg-white/5 rounded-3xl shadow-2xl p-12 backdrop-blur-sm border border-white/10 transform hover:scale-105 transition duration-300 hover:border-amber-500/30"
+        >
           <div className="text-center mb-10">
             <h2 className="text-4xl font-bold text-white mb-6">Begin Your Assessment Journey</h2>
             <div className="flex items-center justify-center gap-3">
@@ -97,19 +122,28 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleStartAssessment}
-            className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-gradient-to-r from-amber-500 to-amber-700 text-white rounded-xl font-semibold text-lg transition duration-300 transform hover:scale-105 hover:shadow-lg hover:from-amber-600 hover:to-amber-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
-          >
-            Start Your Assessment
-            <ArrowRight className="h-6 w-6" />
-          </button>
+          <form onSubmit={handleKeyValidation} className="flex flex-col gap-4">
+            <input
+              type="text"
+              placeholder="Enter Assessment Key"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:border-blue-500 text-black"
+            />
+            {error && <div className="text-red-500 text-center">{error}</div>}
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-gradient-to-r from-amber-500 to-amber-700 text-white rounded-xl font-semibold text-lg transition duration-300 transform hover:scale-105 hover:shadow-lg hover:from-amber-600 hover:to-amber-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+            >
+              Validate Key & Proceed <ArrowRight className="h-6 w-6" />
+            </button>
+          </form>
 
           <div className="mt-8 text-sm text-center text-blue-300">
-            By starting the assessment, you agree to our monitoring and evaluation process
+            By validating your key, you agree to our monitoring and evaluation process.
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

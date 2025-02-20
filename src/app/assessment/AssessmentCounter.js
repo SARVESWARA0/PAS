@@ -15,14 +15,21 @@ import { useAssessmentStore } from "../store/assessmentStore"
 const AssessmentContent = () => {
   const router = useRouter()
   const timerRef = useRef(null)
-  
+
+  // Simplified refs for loading states
+  const loadingRef = useRef({
+    attempted: false,
+    inProgress: false,
+  })
+
+  const stateRestoredRef = useRef(false)
+  const initialLoadAttemptedRef = useRef(false)
+
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [blockCopyPaste, setBlockCopyPaste] = useState(false)
-  const loadingTimeoutRef = useRef(null)
-  const scenariosInitializedRef = useRef(false)
 
   const {
     recordId,
@@ -43,6 +50,8 @@ const AssessmentContent = () => {
     unusualTypingCount,
     timeOverruns,
     setTotalTimeTaken,
+    setScenariosLoaded,
+    scenariosLoaded,
     setPasteCount,
     setTabSwitchCount,
     setUnusualTypingCount,
@@ -50,200 +59,154 @@ const AssessmentContent = () => {
     hasStarted,
     startAssessment,
     resetAssessment,
-    completeAssessment,
+    setResetRequested,
   } = useAssessmentStore()
 
-
-  useEffect(() => {
-    const loadScenarios = async () => {
-      try {
-        // Set loading timeout
-        loadingTimeoutRef.current = setTimeout(() => {
-          setErrorMessage("Loading is taking longer than expected. Please refresh the page.")
-          setIsLoading(false)
-        }, 10000)
-    
-        // Check if we already have scenarios in the store and if they've been initialized
-        if (scenarios && scenarios.length > 0 && hasStarted) {
-          console.log("Using scenarios from store:", scenarios.length)
-          setIsLoading(false)
-          clearTimeout(loadingTimeoutRef.current)
-          return
-        }
-    
-        // Only fetch new scenarios if scenarios array is empty
-        if (!scenarios || scenarios.length === 0) {
-          console.log("Fetching scenarios from API")
-          const response = await fetch("/api/fetchScenarios", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            cache: 'no-store'
-          })
-      
-          if (!response.ok) {
-            throw new Error(`Failed to fetch scenarios: ${response.statusText}`)
-          }
-      
-          const fetchedScenarios = await response.json()
-          
-          if (!fetchedScenarios?.length) {
-            throw new Error("No scenarios received")
-          }
-      
-          // Save scenarios to the store
-          setScenarios(fetchedScenarios)
-          scenariosInitializedRef.current = true
-        }
-    
-        // Initialize assessment if not started
-        if (!hasStarted && !scenariosInitializedRef.current) {
-          const scenariosToUse = scenarios.length > 0 ? scenarios : []
-          const newRecordId = `assessment-${Date.now()}`
-          setRecordId(newRecordId)
-          setCurrentQuestion(0)
-          setCurrentSection(scenariosToUse[0]?.topic || "")
-          startAssessment()
-          scenariosInitializedRef.current = true
-        }
-    
-      } catch (error) {
-        console.error("Error loading scenarios:", error)
-        setErrorMessage(error.message || "Failed to load assessment. Please try again.")
-      } finally {
-        setIsLoading(false)
-        clearTimeout(loadingTimeoutRef.current)
+  const handleEnd = useCallback(
+    (index, section) => {
+      if (!scenarios[index]) return
+  
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
       }
-    }
-    
-    loadScenarios()
-    
-    return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current)
+  
+      const currentTimerState = timing[index]
+      if (!currentTimerState) return
+  
+      const initialTime = scenarios[index].timer * 60
+      // Calculate the actual time taken from the recorded start time
+      const actualTimeTaken = Math.floor((Date.now() - currentTimerState.startTime) / 1000)
+      // Determine overtime as the extra seconds beyond the allotted time
+      const overtime = actualTimeTaken - initialTime
+  
+      if (overtime > 0) {
+        setTimeOverruns((prev) => ({
+          ...prev,
+          [index]: overtime,
+        }))
       }
-    }
-  }, [hasStarted, setRecordId, setCurrentQuestion, setCurrentSection, startAssessment, setScenarios, scenarios])
+  
+      setTiming((prev) => ({
+        ...prev,
+        [index]: {
+          ...prev[index],
+          isCompleted: true,
+          timeLeft: 0,
+        },
+      }))
+  
+      setResponses((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [index]: {
+            ...(prev[section]?.[index] || {}),
+            completed: true,
+            timeTaken: actualTimeTaken,
+          },
+        },
+      }))
+    },
+    [scenarios, setTiming, setResponses, setTimeOverruns, timing],
+  )
   
 
-
-  const handleStart = useCallback(
+  const startTimer = useCallback(
     (index) => {
-      if (!scenarios[index] || scenarios[index].timer === undefined || timerRef.current) {
-        return
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
       }
 
-      // Use existing timing data if available (after refresh) or create new
-      if (!timing[index]) {
-        const startTime = Date.now()
-        const totalTime = scenarios[index].timer * 60
+      const initialTime = scenarios[index]?.timer * 60 || 0
+      if (initialTime <= 0) return
 
+      // Initialize timer state if not already set
+      if (!timing[index]) {
+        const now = Date.now()
         setTiming((prev) => ({
           ...prev,
-          [index]: { startTime, timeLeft: totalTime },
-        }))
-      } else if (timing[index].timeLeft > 0) {
-        // Resume from previous state
-        const currentTime = Date.now()
-        const elapsedSinceLastUpdate = Math.floor((currentTime - timing[index].lastUpdateTime || timing[index].startTime) / 1000)
-        const updatedTimeLeft = Math.max(0, timing[index].timeLeft - elapsedSinceLastUpdate)
-        
-        setTiming((prev) => ({
-          ...prev,
-          [index]: { 
-            ...prev[index],
-            timeLeft: updatedTimeLeft,
-            lastUpdateTime: currentTime
+          [index]: {
+            startTime: now,
+            timeLeft: initialTime,
+            lastUpdateTime: now,
+            isCompleted: false,
           },
         }))
       }
 
       timerRef.current = setInterval(() => {
         setTiming((prev) => {
-          if (!prev[index]) return prev;
-          
-          const currentTime = Date.now()
-          const elapsed = Math.floor((currentTime - prev[index].lastUpdateTime || prev[index].startTime) / 1000)
-          const newTimeLeft = Math.max(0, prev[index].timeLeft - elapsed)
+          const currentTimer = prev[index]
+          if (!currentTimer || currentTimer.isCompleted) {
+            clearInterval(timerRef.current)
+            return prev
+          }
+
+          const now = Date.now()
+          const elapsed = Math.floor((now - currentTimer.lastUpdateTime) / 1000)
+          const newTimeLeft = Math.max(0, currentTimer.timeLeft - elapsed)
 
           if (newTimeLeft <= 0) {
             clearInterval(timerRef.current)
             timerRef.current = null
-            handleEnd(index, currentSection)
+            // Handle end outside of setState to avoid nested updates
+            setTimeout(() => handleEnd(index, currentSection), 0)
+            return {
+              ...prev,
+              [index]: {
+                ...currentTimer,
+                timeLeft: 0,
+                lastUpdateTime: now,
+                isCompleted: true,
+              },
+            }
           }
 
           return {
             ...prev,
-            [index]: { 
-              ...prev[index], 
+            [index]: {
+              ...currentTimer,
               timeLeft: newTimeLeft,
-              lastUpdateTime: currentTime 
+              lastUpdateTime: now,
             },
           }
         })
       }, 1000)
     },
-    [scenarios, setTiming, currentSection, timing],
+    [scenarios, handleEnd, timing, currentSection, setTiming],
   )
 
-  const handleEnd = useCallback(
-    (index, section) => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-
-      if (!scenarios[index]) {
-        console.error("Cannot end assessment for non-existent scenario index:", index);
-        return;
-      }
-
-      setTiming((prev) => {
-        if (!prev[index]) return prev;
-        
-        const initialTime = scenarios[index].timer * 60;
-        const timeTaken = initialTime - (prev[index]?.timeLeft || 0);
-        const timeOverrun = timeTaken > initialTime;
-
-        setResponses((prevResponses) => ({
-          ...prevResponses,
-          [section]: {
-            ...prevResponses[section],
-            [index]: {
-              ...(prevResponses[section]?.[index] || {}),
-              timeTaken,
-              timeOverrun,
-            },
-          },
-        }))
-
-        // Keep timing data but mark as completed
-        return {
-          ...prev,
-          [index]: { ...prev[index], isCompleted: true },
-        }
-      })
+  const handleStart = useCallback(
+    (index) => {
+      if (!scenarios[index]?.timer) return
+      startTimer(index)
     },
-    [scenarios, setTiming, setResponses],
+    [scenarios, startTimer],
   )
 
   const handleResponse = useCallback(
     (section, index, value) => {
       if (!timing[index] && scenarios[index]) {
-        // Initialize timing data if it doesn't exist yet
-        const startTime = Date.now()
+        const now = Date.now()
         const totalTime = scenarios[index].timer * 60
-        
+
         setTiming((prev) => ({
           ...prev,
-          [index]: { startTime, timeLeft: totalTime, lastUpdateTime: startTime },
+          [index]: {
+            startTime: now,
+            timeLeft: totalTime,
+            lastUpdateTime: now,
+            isCompleted: false,
+          },
         }))
       }
 
       const currentTime = Date.now()
       const startTime = timing[index]?.startTime || currentTime
       const responseTime = (currentTime - startTime) / 1000
-
       const isUnusualTyping = detectUnusualTyping(value, responseTime)
+
       if (isUnusualTyping) {
         setUnusualTypingCount((prev) => prev + 1)
       }
@@ -257,14 +220,11 @@ const AssessmentContent = () => {
             response: value,
             responseTime,
             timeTaken: responseTime,
-            pasteCount: prev[section]?.[index]?.pasteCount || 0,
-            tabSwitchCount: prev[section]?.[index]?.tabSwitchCount || 0,
-            unusualTypingCount: (prev[section]?.[index]?.unusualTypingCount || 0) + (isUnusualTyping ? 1 : 0),
           },
         },
       }))
     },
-    [setResponses, setUnusualTypingCount, timing, scenarios, setTiming],
+    [timing, scenarios, setTiming, setResponses, setUnusualTypingCount],
   )
 
   const handleCopyPaste = useCallback(
@@ -275,7 +235,7 @@ const AssessmentContent = () => {
         [currentSection]: {
           ...prev[currentSection],
           [currentQuestion]: {
-            ...prev[currentSection]?.[currentQuestion],
+            ...(prev[currentSection]?.[currentQuestion] || {}),
             pasteCount: (prev[currentSection]?.[currentQuestion]?.pasteCount || 0) + 1,
           },
         },
@@ -290,6 +250,7 @@ const AssessmentContent = () => {
   const handleSubmit = useCallback(async () => {
     setShowConfetti(true)
     setIsLoading(true)
+
     try {
       const payload = {
         recordId,
@@ -303,24 +264,24 @@ const AssessmentContent = () => {
         },
       }
 
-      scenarios.forEach((scenario, index) => {
-        const response = responses[scenario.topic]?.[index]
-        if (response) {
-          if (!payload.responses[scenario.topic]) {
-            payload.responses[scenario.topic] = {}
+      Object.entries(responses).forEach(([topic, topicResponses]) => {
+        payload.responses[topic] = {}
+        Object.entries(topicResponses).forEach(([index, response]) => {
+          const scenario = scenarios[Number.parseInt(index)]
+          if (scenario && response) {
+            payload.responses[topic][index] = {
+              id: scenario.id,
+              headers: scenario.header,
+              question: scenario.question,
+              answer: response.response,
+              responseTime: response.responseTime,
+              timeTaken: response.timeTaken,
+              pasteCount: response.pasteCount || 0,
+              tabSwitchCount: response.tabSwitchCount || 0,
+              unusualTypingCount: response.unusualTypingCount || 0,
+            }
           }
-          payload.responses[scenario.topic][index] = {
-            id: scenario.id,
-            headers: scenario.header,
-            question: scenario.question,
-            answer: response.response,
-            responseTime: response.responseTime,
-            timeTaken: response.timeTaken,
-            pasteCount: response.pasteCount,
-            tabSwitchCount: response.tabSwitchCount,
-            unusualTypingCount: response.unusualTypingCount,
-          }
-        }
+        })
       })
 
       const res = await fetch("/api/chat", {
@@ -330,83 +291,143 @@ const AssessmentContent = () => {
       })
 
       if (!res.ok) {
-        setShowConfetti(false)
         throw new Error(`HTTP error! status: ${res.status}`)
       }
-      
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+
+      setResetRequested(true)
       resetAssessment()
-      completeAssessment()
-      console.log("Assessment submitted successfully")
       router.push("/thank-you")
     } catch (error) {
       console.error("Error submitting assessment:", error)
       setIsLoading(false)
       setErrorMessage("Failed to submit assessment: " + error.message)
+      setShowConfetti(false)
     }
-  },  [
+  }, [
     recordId,
+    responses,
+    scenarios,
     pasteCount,
     tabSwitchCount,
     unusualTypingCount,
     timeOverruns,
     totalTimeTaken,
-    scenarios,
-    responses,
     router,
+    setResetRequested,
     resetAssessment,
-    completeAssessment
   ])
-  
+
   const handleNext = useCallback(() => {
     if (!scenarios[currentQuestion]) {
-      setErrorMessage("Question data is not available. Please reload the page and try again.");
-      return;
-    }
-
-    const currentResponseData = responses[currentSection]?.[currentQuestion]?.response || ""
-    if (currentResponseData.trim().split(/\s+/).length < 5) {
-      setErrorMessage("Please provide an answer with at least 5 words before moving to the next question.")
+      setErrorMessage("Question data is not available")
       return
     }
+
+    const currentResponse = responses[currentSection]?.[currentQuestion]?.response || ""
+    if (currentResponse.trim().split(/\s+/).length < 5) {
+      setErrorMessage("Please provide at least 5 words")
+      return
+    }
+
     setErrorMessage("")
-
-    setResponses((prev) => ({
-      ...prev,
-      [currentSection]: {
-        ...prev[currentSection],
-        [currentQuestion]: {
-          ...prev[currentSection]?.[currentQuestion],
-          completed: true,
-        },
-      },
-    }))
-
     handleEnd(currentQuestion, currentSection)
 
     if (currentQuestion < scenarios.length - 1) {
-      const nextQuestion = currentQuestion + 1;
-      setCurrentQuestion(nextQuestion)
-      setCurrentSection(scenarios[nextQuestion].topic)
+      setCurrentQuestion(currentQuestion + 1)
+      setCurrentSection(scenarios[currentQuestion + 1].topic)
     } else {
       setShowConfirmation(true)
     }
 
     const remainingTime = timing[currentQuestion]?.timeLeft || 0
-    const timeTaken = scenarios[currentQuestion]?.timer * 60 - remainingTime
+    const timeTaken = scenarios[currentQuestion].timer * 60 - remainingTime
     setTotalTimeTaken((prev) => prev + timeTaken)
   }, [
-    currentSection,
     currentQuestion,
+    currentSection,
     scenarios,
     responses,
-    setResponses,
+    timing,
     handleEnd,
     setCurrentQuestion,
     setCurrentSection,
     setTotalTimeTaken,
-    timing,
   ])
 
+  // Simplified effect for timer management
+  useEffect(() => {
+    if (!stateRestoredRef.current) {
+      stateRestoredRef.current = true
+      return
+    }
+
+    if (initialLoadAttemptedRef.current || scenarios.length > 0 || scenariosLoaded) {
+      setIsLoading(false)
+      return
+    }
+
+    initialLoadAttemptedRef.current = true
+
+    const loadScenarios = async () => {
+      if (loadingRef.current.inProgress) return
+
+      try {
+        loadingRef.current.inProgress = true
+        setIsLoading(true)
+
+        const response = await fetch("/api/fetchScenarios", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch scenarios: ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        if (!Array.isArray(data) || data.length === 0) {
+          throw new Error("No scenarios available")
+        }
+
+        setScenarios(data)
+        setScenariosLoaded(true)
+
+        if (!hasStarted) {
+          setRecordId(`assessment-${Date.now()}`)
+          setCurrentQuestion(0)
+          setCurrentSection(data[0]?.topic || "")
+          startAssessment()
+        }
+      } catch (error) {
+        console.error("Error loading scenarios:", error)
+        setErrorMessage(error.message || "Failed to load assessment")
+      } finally {
+        loadingRef.current.inProgress = false
+        setIsLoading(false)
+      }
+    }
+
+    loadScenarios()
+  }, [
+    scenarios,
+    scenariosLoaded,
+    hasStarted,
+    setRecordId,
+    setCurrentQuestion,
+    setCurrentSection,
+    startAssessment,
+    setScenarios,
+    setScenariosLoaded,
+  ])
+
+  // Handle tab visibility
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -425,71 +446,97 @@ const AssessmentContent = () => {
     }
 
     document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
   }, [currentSection, currentQuestion, setTabSwitchCount, setResponses])
 
+  // Start timer for current question
   useEffect(() => {
-    const preventCopy = (e) => {
-      if (blockCopyPaste) {
-        e.preventDefault()
-      }
-    }
+    if (!scenarios[currentQuestion]?.timer) return
+    if (timing[currentQuestion]?.isCompleted) return
 
-    document.addEventListener("copy", preventCopy)
-    return () => {
-      document.removeEventListener("copy", preventCopy)
-    }
-  }, [blockCopyPaste])
-
-  // Start timer for current question when component mounts or question changes
-  useEffect(() => {
-    // Don't start timer until scenarios are loaded
-    if (scenarios.length === 0 || currentQuestion === undefined || currentQuestion === null) {
-      return;
-    }
-    
-    const currentScenario = scenarios[currentQuestion];
-    if (!currentScenario) return;
-    
-    const isCompleted = timing[currentQuestion]?.isCompleted || responses[currentSection]?.[currentQuestion]?.completed;
-    const timerAlreadyRunning = timerRef.current !== null;
-    
-    if (!isCompleted && !timerAlreadyRunning) {
-      handleStart(currentQuestion);
-    }
+    handleStart(currentQuestion)
 
     return () => {
       if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+        clearInterval(timerRef.current)
+        timerRef.current = null
       }
-    };
-  }, [scenarios, currentQuestion, currentSection, responses, timing, handleStart]);
+    }
+  }, [currentQuestion, scenarios, timing, handleStart])
 
-  // Safety check - if no scenarios or currentQuestion is invalid, show a loading state
-  if (isLoading || !scenarios.length) {
-    return <LoadingSpinner />
+  // Add a timeout for loading
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (isLoading && !scenarios.length) {
+        setErrorMessage("Loading is taking longer than expected. Please refresh the page.")
+      }
+    }, 10000) // 10 second timeout
+
+    return () => clearTimeout(timeoutId)
+  }, [isLoading, scenarios.length])
+
+  // Early return for loading state with better UI feedback
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex justify-center items-center">
+        <div className="bg-gray-800/80 backdrop-blur-lg shadow-2xl rounded-3xl p-8 max-w-lg mx-auto text-center">
+          <LoadingSpinner />
+          <p className="text-gray-300 mt-4">Loading assessment...</p>
+          {errorMessage && (
+            <div className="mt-4 text-red-400 bg-red-900/30 p-4 rounded-xl flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
-  // Check if currentQuestion is valid before rendering
-  const currentScenario = scenarios[currentQuestion];
-  if (!currentScenario) {
+  // Error state with retry button
+  if (!scenarios.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex justify-center items-center">
         <div className="bg-gray-800/80 backdrop-blur-lg shadow-2xl rounded-3xl p-8 max-w-lg mx-auto">
           <h2 className="text-2xl font-semibold text-red-300 mb-4">Error Loading Assessment</h2>
-          <p className="text-gray-300">There was a problem loading the assessment questions. Please try refreshing the page.</p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <p className="text-gray-300">
+            There was a problem loading the assessment questions. Please try refreshing the page.
+          </p>
+          <button
+            onClick={() => {
+              loadingRef.current.inProgress = false
+              initialLoadAttemptedRef.current = false
+              setIsLoading(true)
+              setErrorMessage("")
+              window.location.reload()
+            }}
             className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg"
           >
             Reload Page
           </button>
         </div>
       </div>
-    );
+    )
+  }
+
+  const currentScenario = scenarios[currentQuestion]
+  if (!currentScenario) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex justify-center items-center">
+        <div className="bg-gray-800/80 backdrop-blur-lg shadow-2xl rounded-3xl p-8 max-w-lg mx-auto">
+          <h2 className="text-2xl font-semibold text-red-300 mb-4">Error Loading Assessment</h2>
+          <p className="text-gray-300">
+            There was a problem loading the assessment questions. Please try refreshing the page.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const totalQuestions = scenarios.length
@@ -498,7 +545,6 @@ const AssessmentContent = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex">
       {showConfetti && <Confetti />}
-
       <div className="flex-1 pl-28 min-h-screen overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-12">
           <motion.div
@@ -516,7 +562,6 @@ const AssessmentContent = () => {
                 </h1>
                 <p className="mt-2 text-indigo-100 text-lg relative z-10">{currentSection}</p>
               </div>
-
               <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
                   <span className="text-sm font-medium text-indigo-300 bg-indigo-900/50 px-4 py-2 rounded-full">
@@ -530,9 +575,7 @@ const AssessmentContent = () => {
                     </span>
                   </div>
                 </div>
-
                 <ProgressBar current={currentQuestionNumber} total={totalQuestions} />
-
                 <motion.h2
                   key={`header-${currentQuestion}`}
                   initial={{ opacity: 0, y: 20 }}
@@ -542,7 +585,6 @@ const AssessmentContent = () => {
                 >
                   {currentScenario.header}
                 </motion.h2>
-
                 <motion.p
                   key={`question-${currentQuestion}`}
                   initial={{ opacity: 0, y: 20 }}
@@ -552,7 +594,6 @@ const AssessmentContent = () => {
                 >
                   {currentScenario.question}
                 </motion.p>
-
                 <motion.textarea
                   key={`textarea-${currentQuestion}-${currentSection}`}
                   initial={{ opacity: 0, y: 20 }}
@@ -565,7 +606,6 @@ const AssessmentContent = () => {
                   onPaste={handleCopyPaste}
                   value={responses[currentSection]?.[currentQuestion]?.response || ""}
                 />
-
                 {errorMessage && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -576,7 +616,6 @@ const AssessmentContent = () => {
                     <span>{errorMessage}</span>
                   </motion.div>
                 )}
-
                 <div className="mt-8 space-y-6">
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -604,7 +643,6 @@ const AssessmentContent = () => {
           </motion.div>
         </div>
       </div>
-
       {isLoading && <LoadingSpinner />}
       <ConfirmationModal
         isOpen={showConfirmation}
@@ -616,3 +654,4 @@ const AssessmentContent = () => {
 }
 
 export default AssessmentContent
+
