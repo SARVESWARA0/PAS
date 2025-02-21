@@ -94,7 +94,7 @@ export const useAssessmentStore = create(
           timeOverruns: {},
           isAssessmentComplete: false,
           scenariosLoaded: false,
-          resetRequested: false, // clear the flag after reset
+          resetRequested: true, // clear the flag after reset
         }),
     }),
     {

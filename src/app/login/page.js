@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowRight, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowRight, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
 import { useAssessmentStore } from "../store/assessmentStore"
 
 export default function LoginPage() {
@@ -12,7 +12,11 @@ export default function LoginPage() {
     phone: "",
     email: "",
   })
-  const [phoneError, setPhoneError] = useState("")
+  const [formErrors, setFormErrors] = useState({
+    college: "",
+    department: "",
+    phone: ""
+  })
   const [colleges, setColleges] = useState([])
   const [departments, setDepartments] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -61,19 +65,52 @@ export default function LoginPage() {
     if (name === "phone") {
       const phone = value.replace(/\D/g, "")
       if (phone.length > 10) {
-        setPhoneError("Phone number must be exactly 10 digits.")
+        setFormErrors(prev => ({...prev, phone: "Phone number must be exactly 10 digits."}))
         return
       } else {
-        setPhoneError("")
+        setFormErrors(prev => ({...prev, phone: ""}))
       }
       setFormData({ ...formData, phone })
     } else {
       setFormData({ ...formData, [name]: value })
     }
+    
+    // Clear errors when field is filled
+    if (name === "college" || name === "department") {
+      if (value.trim()) {
+        setFormErrors(prev => ({...prev, [name]: ""}))
+      }
+    }
+  }
+
+  const validateForm = () => {
+    const errors = {}
+    let isValid = true
+
+    if (!formData.college.trim()) {
+      errors.college = "College is required"
+      isValid = false
+    }
+    if (!formData.department.trim()) {
+      errors.department = "Department is required"
+      isValid = false
+    }
+    if (!formData.phone || formData.phone.length !== 10) {
+      errors.phone = "Valid 10-digit phone number is required"
+      isValid = false
+    }
+
+    setFormErrors({...formErrors, ...errors})
+    return isValid
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+    
     try {
       const response = await fetch("/api/airtable", {
         method: "POST",
@@ -115,6 +152,7 @@ export default function LoginPage() {
         const selectedCollege = filteredColleges[selectedCollegeIndex]
         setFormData((prev) => ({ ...prev, college: selectedCollege }))
         setCollegeSearch(selectedCollege)
+        setFormErrors(prev => ({...prev, college: ""}))
         setShowCollegeDropdown(false)
       }
     } else if (type === "department") {
@@ -129,6 +167,7 @@ export default function LoginPage() {
         const selectedDepartment = filteredDepartments[selectedDepartmentIndex]
         setFormData((prev) => ({ ...prev, department: selectedDepartment }))
         setDepartmentSearch(selectedDepartment)
+        setFormErrors(prev => ({...prev, department: ""}))
         setShowDepartmentDropdown(false)
       }
     }
@@ -174,19 +213,26 @@ export default function LoginPage() {
           </div>
 
           <div className="relative search-dropdown space-y-1" ref={collegeDropdownRef}>
-            <label className="block text-sm font-semibold text-gray-700">College</label>
+            <label className="block text-sm font-semibold text-gray-700 flex items-center">
+              College <span className="text-red-500 ml-1">*</span>
+            </label>
             {!customCollege ? (
               <div>
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Search for your college..."
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400"
+                    className={`w-full px-4 py-3 rounded-xl border ${
+                      formErrors.college ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
                     value={collegeSearch}
                     onChange={(e) => {
                       setCollegeSearch(e.target.value)
                       setShowCollegeDropdown(true)
                       setSelectedCollegeIndex(-1)
+                      if (e.target.value === formData.college) {
+                        setFormErrors(prev => ({...prev, college: ""}))
+                      }
                     }}
                     onFocus={() => setShowCollegeDropdown(true)}
                     onKeyDown={(e) => handleKeyDown(e, "college")}
@@ -211,6 +257,7 @@ export default function LoginPage() {
                             onClick={() => {
                               setFormData((prev) => ({ ...prev, college }))
                               setCollegeSearch(college)
+                              setFormErrors(prev => ({...prev, college: ""}))
                               setShowCollegeDropdown(false)
                             }}
                           >
@@ -224,9 +271,14 @@ export default function LoginPage() {
                             type="button"
                             className="mt-2 w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             onClick={() => {
-                              setCustomCollege(true)
-                              setFormData((prev) => ({ ...prev, college: collegeSearch }))
-                              setShowCollegeDropdown(false)
+                              if (collegeSearch.trim()) {
+                                setCustomCollege(true)
+                                setFormData((prev) => ({ ...prev, college: collegeSearch }))
+                                setFormErrors(prev => ({...prev, college: ""}))
+                                setShowCollegeDropdown(false)
+                              } else {
+                                setFormErrors(prev => ({...prev, college: "College name is required"}))
+                              }
                             }}
                           >
                             Add new college
@@ -236,45 +288,68 @@ export default function LoginPage() {
                     </div>
                   )}
                 </div>
+                {formErrors.college && (
+                  <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{formErrors.college}</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="flex gap-2">
-                <input
-                  name="college"
-                  value={formData.college}
-                  onChange={handleChange}
-                  placeholder="Enter college name"
-                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400"
-                />
-                <button
-                  type="button"
-                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors"
-                  onClick={() => {
-                    setCustomCollege(false)
-                    setFormData((prev) => ({ ...prev, college: "" }))
-                    setCollegeSearch("")
-                  }}
-                >
-                  Cancel
-                </button>
+              <div className="flex gap-2 flex-col">
+                <div className="flex gap-2">
+                  <input
+                    name="college"
+                    value={formData.college}
+                    onChange={handleChange}
+                    placeholder="Enter college name"
+                    className={`flex-1 px-4 py-3 rounded-xl border ${
+                      formErrors.college ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
+                  />
+                  <button
+                    type="button"
+                    className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors"
+                    onClick={() => {
+                      setCustomCollege(false)
+                      setFormData((prev) => ({ ...prev, college: "" }))
+                      setCollegeSearch("")
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {formErrors.college && (
+                  <div className="flex items-center gap-2 text-red-500 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{formErrors.college}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           <div className="relative search-dropdown space-y-1" ref={departmentDropdownRef}>
-            <label className="block text-sm font-semibold text-gray-700">Department</label>
+            <label className="block text-sm font-semibold text-gray-700 flex items-center">
+              Department <span className="text-red-500 ml-1">*</span>
+            </label>
             {!customDepartment ? (
               <div>
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Search for your department..."
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400"
+                    className={`w-full px-4 py-3 rounded-xl border ${
+                      formErrors.department ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
                     value={departmentSearch}
                     onChange={(e) => {
                       setDepartmentSearch(e.target.value)
                       setShowDepartmentDropdown(true)
                       setSelectedDepartmentIndex(-1)
+                      if (e.target.value === formData.department) {
+                        setFormErrors(prev => ({...prev, department: ""}))
+                      }
                     }}
                     onFocus={() => setShowDepartmentDropdown(true)}
                     onKeyDown={(e) => handleKeyDown(e, "department")}
@@ -299,6 +374,7 @@ export default function LoginPage() {
                             onClick={() => {
                               setFormData((prev) => ({ ...prev, department }))
                               setDepartmentSearch(department)
+                              setFormErrors(prev => ({...prev, department: ""}))
                               setShowDepartmentDropdown(false)
                             }}
                           >
@@ -312,9 +388,14 @@ export default function LoginPage() {
                             type="button"
                             className="mt-2 w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             onClick={() => {
-                              setCustomDepartment(true)
-                              setFormData((prev) => ({ ...prev, department: departmentSearch }))
-                              setShowDepartmentDropdown(false)
+                              if (departmentSearch.trim()) {
+                                setCustomDepartment(true)
+                                setFormData((prev) => ({ ...prev, department: departmentSearch }))
+                                setFormErrors(prev => ({...prev, department: ""}))
+                                setShowDepartmentDropdown(false)
+                              } else {
+                                setFormErrors(prev => ({...prev, department: "Department name is required"}))
+                              }
                             }}
                           >
                             Add new department
@@ -324,34 +405,50 @@ export default function LoginPage() {
                     </div>
                   )}
                 </div>
+                {formErrors.department && (
+                  <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{formErrors.department}</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="flex gap-2">
-                <input
-                  name="department"
-                  value={formData.department}
-                  onChange={handleChange}
-                  placeholder="Enter department name"
-                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400"
-                />
-                <button
-                  type="button"
-                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors"
-                  onClick={() => {
-                    setCustomDepartment(false)
-                    setFormData((prev) => ({ ...prev, department: "" }))
-                    setDepartmentSearch("")
-                  }}
-                >
-                  Cancel
-                </button>
+              <div className="flex gap-2 flex-col">
+                <div className="flex gap-2">
+                  <input
+                    name="department"
+                    value={formData.department}
+                    onChange={handleChange}
+                    placeholder="Enter department name"
+                    className={`flex-1 px-4 py-3 rounded-xl border ${
+                      formErrors.department ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
+                  />
+                  <button
+                    type="button"
+                    className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors"
+                    onClick={() => {
+                      setCustomDepartment(false)
+                      setFormData((prev) => ({ ...prev, department: "" }))
+                      setDepartmentSearch("")
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {formErrors.department && (
+                  <div className="flex items-center gap-2 text-red-500 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{formErrors.department}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
-              Phone Number
+            <label htmlFor="phone" className="block text-sm font-semibold text-gray-700 flex items-center">
+              Phone Number <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               id="phone"
@@ -359,12 +456,19 @@ export default function LoginPage() {
               type="tel"
               required
               pattern="[0-9]{10}"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400"
+              className={`w-full px-4 py-3 rounded-xl border ${
+                formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
+              } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
               value={formData.phone}
               onChange={handleChange}
               placeholder="Enter your phone number"
             />
-            {phoneError && <p className="text-red-500 text-sm">{phoneError}</p>}
+            {formErrors.phone && (
+              <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <span>{formErrors.phone}</span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">
