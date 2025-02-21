@@ -1,35 +1,28 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
-import { ChevronRight, Clock, AlertCircle, Sparkles } from "lucide-react"
-import { motion } from "framer-motion"
-import LoadingSpinner from "../components/LoadingSpinner"
-import ConfirmationModal from "../components/ConfirmationModal"
-import { detectUnusualTyping } from "../utils/detectUnusualTyping"
-import ProgressBar from "../components/ProgressBar"
-import Confetti from "react-confetti"
-import { useAssessmentStore } from "../store/assessmentStore"
-
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, Clock, AlertCircle, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ConfirmationModal from "../components/ConfirmationModal";
+import { detectUnusualTyping } from "../utils/detectUnusualTyping";
+import ProgressBar from "../components/ProgressBar";
+import Confetti from "react-confetti";
+import { useAssessmentStore } from "../store/assessmentStore";
 
 const AssessmentContent = () => {
-  const router = useRouter()
-  const timerRef = useRef(null)
+  const router = useRouter();
+  const timerRef = useRef(null);
+  const loadingRef = useRef({ attempted: false, inProgress: false });
+  const stateRestoredRef = useRef(false);
+  const initialLoadAttemptedRef = useRef(false);
 
-  // Simplified refs for loading states
-  const loadingRef = useRef({
-    attempted: false,
-    inProgress: false,
-  })
-
-  const stateRestoredRef = useRef(false)
-  const initialLoadAttemptedRef = useRef(false)
-
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState("")
-  const [showConfirmation, setShowConfirmation] = useState(false)
-  const [showConfetti, setShowConfetti] = useState(false)
-  const [blockCopyPaste, setBlockCopyPaste] = useState(false)
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [blockCopyPaste, setBlockCopyPaste] = useState(false);
 
   const {
     recordId,
@@ -60,33 +53,31 @@ const AssessmentContent = () => {
     startAssessment,
     resetAssessment,
     setResetRequested,
-  } = useAssessmentStore()
+  } = useAssessmentStore();
 
   const handleEnd = useCallback(
     (index, section) => {
-      if (!scenarios[index]) return
-  
+      if (!scenarios[index]) return;
+
       if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-  
-      const currentTimerState = timing[index]
-      if (!currentTimerState) return
-  
-      const initialTime = scenarios[index].timer * 60
-      // Calculate the actual time taken from the recorded start time
-      const actualTimeTaken = Math.floor((Date.now() - currentTimerState.startTime) / 1000)
-      // Determine overtime as the extra seconds beyond the allotted time
-      const overtime = actualTimeTaken - initialTime
-  
+
+      const currentTimerState = timing[index];
+      if (!currentTimerState) return;
+
+      const initialTime = scenarios[index].timer * 60;
+      const actualTimeTaken = Math.floor((Date.now() - currentTimerState.startTime) / 1000);
+      const overtime = actualTimeTaken - initialTime;
+
       if (overtime > 0) {
         setTimeOverruns((prev) => ({
           ...prev,
           [index]: overtime,
-        }))
+        }));
       }
-  
+
       setTiming((prev) => ({
         ...prev,
         [index]: {
@@ -94,8 +85,8 @@ const AssessmentContent = () => {
           isCompleted: true,
           timeLeft: 0,
         },
-      }))
-  
+      }));
+
       setResponses((prev) => ({
         ...prev,
         [section]: {
@@ -106,24 +97,22 @@ const AssessmentContent = () => {
             timeTaken: actualTimeTaken,
           },
         },
-      }))
+      }));
     },
-    [scenarios, setTiming, setResponses, setTimeOverruns, timing],
-  )
-  
+    [scenarios, setTiming, setResponses, setTimeOverruns, timing]
+  );
 
   const startTimer = useCallback(
     (index) => {
       if (timerRef.current) {
-        clearInterval(timerRef.current)
+        clearInterval(timerRef.current);
       }
 
-      const initialTime = scenarios[index]?.timer * 60 || 0
-      if (initialTime <= 0) return
+      const initialTime = scenarios[index]?.timer * 60 || 0;
+      if (initialTime <= 0) return;
 
-      // Initialize timer state if not already set
       if (!timing[index]) {
-        const now = Date.now()
+        const now = Date.now();
         setTiming((prev) => ({
           ...prev,
           [index]: {
@@ -132,26 +121,25 @@ const AssessmentContent = () => {
             lastUpdateTime: now,
             isCompleted: false,
           },
-        }))
+        }));
       }
 
       timerRef.current = setInterval(() => {
         setTiming((prev) => {
-          const currentTimer = prev[index]
+          const currentTimer = prev[index];
           if (!currentTimer || currentTimer.isCompleted) {
-            clearInterval(timerRef.current)
-            return prev
+            clearInterval(timerRef.current);
+            return prev;
           }
 
-          const now = Date.now()
-          const elapsed = Math.floor((now - currentTimer.lastUpdateTime) / 1000)
-          const newTimeLeft = Math.max(0, currentTimer.timeLeft - elapsed)
+          const now = Date.now();
+          const elapsed = Math.floor((now - currentTimer.lastUpdateTime) / 1000);
+          const newTimeLeft = Math.max(0, currentTimer.timeLeft - elapsed);
 
           if (newTimeLeft <= 0) {
-            clearInterval(timerRef.current)
-            timerRef.current = null
-            // Handle end outside of setState to avoid nested updates
-            setTimeout(() => handleEnd(index, currentSection), 0)
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+            setTimeout(() => handleEnd(index, currentSection), 0);
             return {
               ...prev,
               [index]: {
@@ -160,7 +148,7 @@ const AssessmentContent = () => {
                 lastUpdateTime: now,
                 isCompleted: true,
               },
-            }
+            };
           }
 
           return {
@@ -170,27 +158,26 @@ const AssessmentContent = () => {
               timeLeft: newTimeLeft,
               lastUpdateTime: now,
             },
-          }
-        })
-      }, 1000)
+          };
+        });
+      }, 1000);
     },
-    [scenarios, handleEnd, timing, currentSection, setTiming],
-  )
+    [scenarios, handleEnd, timing, currentSection, setTiming]
+  );
 
   const handleStart = useCallback(
     (index) => {
-      if (!scenarios[index]?.timer) return
-      startTimer(index)
+      if (!scenarios[index]?.timer) return;
+      startTimer(index);
     },
-    [scenarios, startTimer],
-  )
+    [scenarios, startTimer]
+  );
 
   const handleResponse = useCallback(
     (section, index, value) => {
       if (!timing[index] && scenarios[index]) {
-        const now = Date.now()
-        const totalTime = scenarios[index].timer * 60
-
+        const now = Date.now();
+        const totalTime = scenarios[index].timer * 60;
         setTiming((prev) => ({
           ...prev,
           [index]: {
@@ -199,16 +186,15 @@ const AssessmentContent = () => {
             lastUpdateTime: now,
             isCompleted: false,
           },
-        }))
+        }));
       }
-
-      const currentTime = Date.now()
-      const startTime = timing[index]?.startTime || currentTime
-      const responseTime = (currentTime - startTime) / 1000
-      const isUnusualTyping = detectUnusualTyping(value, responseTime)
+      const currentTime = Date.now();
+      const startTime = timing[index]?.startTime || currentTime;
+      const responseTime = (currentTime - startTime) / 1000;
+      const isUnusualTyping = detectUnusualTyping(value, responseTime);
 
       if (isUnusualTyping) {
-        setUnusualTypingCount((prev) => prev + 1)
+        setUnusualTypingCount((prev) => prev + 1);
       }
 
       setResponses((prev) => ({
@@ -222,14 +208,14 @@ const AssessmentContent = () => {
             timeTaken: responseTime,
           },
         },
-      }))
+      }));
     },
-    [timing, scenarios, setTiming, setResponses, setUnusualTypingCount],
-  )
+    [timing, scenarios, setTiming, setResponses, setUnusualTypingCount]
+  );
 
   const handleCopyPaste = useCallback(
     (e) => {
-      setPasteCount((prev) => prev + 1)
+      setPasteCount((prev) => prev + 1);
       setResponses((prev) => ({
         ...prev,
         [currentSection]: {
@@ -239,17 +225,17 @@ const AssessmentContent = () => {
             pasteCount: (prev[currentSection]?.[currentQuestion]?.pasteCount || 0) + 1,
           },
         },
-      }))
+      }));
       if (blockCopyPaste) {
-        e.preventDefault()
+        e.preventDefault();
       }
     },
-    [blockCopyPaste, currentQuestion, currentSection, setPasteCount, setResponses],
-  )
+    [blockCopyPaste, currentQuestion, currentSection, setPasteCount, setResponses]
+  );
 
   const handleSubmit = useCallback(async () => {
-    setShowConfetti(true)
-    setIsLoading(true)
+    setShowConfetti(true);
+    setIsLoading(true);
 
     try {
       const payload = {
@@ -262,12 +248,12 @@ const AssessmentContent = () => {
           timeOverruns,
           totalTimeTaken,
         },
-      }
+      };
 
       Object.entries(responses).forEach(([topic, topicResponses]) => {
-        payload.responses[topic] = {}
+        payload.responses[topic] = {};
         Object.entries(topicResponses).forEach(([index, response]) => {
-          const scenario = scenarios[Number.parseInt(index)]
+          const scenario = scenarios[Number.parseInt(index)];
           if (scenario && response) {
             payload.responses[topic][index] = {
               id: scenario.id,
@@ -279,34 +265,34 @@ const AssessmentContent = () => {
               pasteCount: response.pasteCount || 0,
               tabSwitchCount: response.tabSwitchCount || 0,
               unusualTypingCount: response.unusualTypingCount || 0,
-            }
+            };
           }
-        })
-      })
+        });
+      });
 
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      })
+      });
 
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`)
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
 
       if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
 
-      setResetRequested(true)
-      resetAssessment()
-      router.push("/thank-you")
+      setResetRequested(true);
+      resetAssessment();
+      router.push("/thank-you");
     } catch (error) {
-      console.error("Error submitting assessment:", error)
-      setIsLoading(false)
-      setErrorMessage("Failed to submit assessment: " + error.message)
-      setShowConfetti(false)
+      console.error("Error submitting assessment:", error);
+      setIsLoading(false);
+      setErrorMessage("Failed to submit assessment: " + error.message);
+      setShowConfetti(false);
     }
   }, [
     recordId,
@@ -320,33 +306,29 @@ const AssessmentContent = () => {
     router,
     setResetRequested,
     resetAssessment,
-  ])
+  ]);
 
   const handleNext = useCallback(() => {
     if (!scenarios[currentQuestion]) {
-      setErrorMessage("Question data is not available")
-      return
+      setErrorMessage("Question data is not available");
+      return;
     }
-
-    const currentResponse = responses[currentSection]?.[currentQuestion]?.response || ""
+    const currentResponse = responses[currentSection]?.[currentQuestion]?.response || "";
     if (currentResponse.trim().split(/\s+/).length < 5) {
-      setErrorMessage("Please provide at least 5 words")
-      return
+      setErrorMessage("Please provide at least 5 words");
+      return;
     }
-
-    setErrorMessage("")
-    handleEnd(currentQuestion, currentSection)
-
+    setErrorMessage("");
+    handleEnd(currentQuestion, currentSection);
     if (currentQuestion < scenarios.length - 1) {
-      setCurrentQuestion(currentQuestion + 1)
-      setCurrentSection(scenarios[currentQuestion + 1].topic)
+      setCurrentQuestion(currentQuestion + 1);
+      setCurrentSection(scenarios[currentQuestion + 1].topic);
     } else {
-      setShowConfirmation(true)
+      setShowConfirmation(true);
     }
-
-    const remainingTime = timing[currentQuestion]?.timeLeft || 0
-    const timeTaken = scenarios[currentQuestion].timer * 60 - remainingTime
-    setTotalTimeTaken((prev) => prev + timeTaken)
+    const remainingTime = timing[currentQuestion]?.timeLeft || 0;
+    const timeTaken = scenarios[currentQuestion].timer * 60 - remainingTime;
+    setTotalTimeTaken((prev) => prev + timeTaken);
   }, [
     currentQuestion,
     currentSection,
@@ -357,81 +339,72 @@ const AssessmentContent = () => {
     setCurrentQuestion,
     setCurrentSection,
     setTotalTimeTaken,
-  ])
+  ]);
 
-  // Simplified effect for timer management
-  useEffect(() => {
-    if (!stateRestoredRef.current) {
-      stateRestoredRef.current = true
-      return
-    }
-
-    if (initialLoadAttemptedRef.current || scenarios.length > 0 || scenariosLoaded) {
-      setIsLoading(false)
-      return
-    }
-
-    initialLoadAttemptedRef.current = true
-
-    const loadScenarios = async () => {
-      if (loadingRef.current.inProgress) return
-
-      try {
-        loadingRef.current.inProgress = true
-        setIsLoading(true)
-
-        const response = await fetch("/api/fetchScenarios", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch scenarios: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        if (!Array.isArray(data) || data.length === 0) {
-          throw new Error("No scenarios available")
-        }
-
-        setScenarios(data)
-        setScenariosLoaded(true)
-
-        if (!hasStarted) {
-          setRecordId(`assessment-${Date.now()}`)
-          setCurrentQuestion(0)
-          setCurrentSection(data[0]?.topic || "")
-          startAssessment()
-        }
-      } catch (error) {
-        console.error("Error loading scenarios:", error)
-        setErrorMessage(error.message || "Failed to load assessment")
-      } finally {
-        loadingRef.current.inProgress = false
-        setIsLoading(false)
+  // Load scenarios with a retry mechanism (up to 3 attempts)
+  const loadScenarios = useCallback(async (retry = 0) => {
+    if (loadingRef.current.inProgress) return;
+    try {
+      loadingRef.current.inProgress = true;
+      setIsLoading(true);
+      const response = await fetch("/api/fetchScenarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch scenarios: ${response.status}`);
       }
+      const data = await response.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error("No scenarios available");
+      }
+      setScenarios(data);
+      setScenariosLoaded(true);
+      if (!hasStarted) {
+        setRecordId(`assessment-${Date.now()}`);
+        setCurrentQuestion(0);
+        setCurrentSection(data[0]?.topic || "");
+        startAssessment();
+      }
+    } catch (error) {
+      if (retry < 3) {
+        setTimeout(() => loadScenarios(retry + 1), 2000);
+      } else {
+        console.error("Error loading scenarios:", error);
+        setErrorMessage(error.message || "Failed to load assessment");
+      }
+    } finally {
+      loadingRef.current.inProgress = false;
+      setIsLoading(false);
     }
-
-    loadScenarios()
   }, [
-    scenarios,
-    scenariosLoaded,
     hasStarted,
+    setScenarios,
+    setScenariosLoaded,
     setRecordId,
     setCurrentQuestion,
     setCurrentSection,
     startAssessment,
-    setScenarios,
-    setScenariosLoaded,
-  ])
+  ]);
 
-  // Handle tab visibility
+  useEffect(() => {
+    if (!stateRestoredRef.current) {
+      stateRestoredRef.current = true;
+      return;
+    }
+    if (initialLoadAttemptedRef.current || scenarios.length > 0 || scenariosLoaded) {
+      setIsLoading(false);
+      return;
+    }
+    initialLoadAttemptedRef.current = true;
+    loadScenarios();
+  }, [scenarios, scenariosLoaded, loadScenarios]);
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setTabSwitchCount((prev) => prev + 1)
+        setTabSwitchCount((prev) => prev + 1);
         setResponses((prev) => ({
           ...prev,
           [currentSection]: {
@@ -441,41 +414,34 @@ const AssessmentContent = () => {
               tabSwitchCount: (prev[currentSection]?.[currentQuestion]?.tabSwitchCount || 0) + 1,
             },
           },
-        }))
+        }));
       }
-    }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [currentSection, currentQuestion, setTabSwitchCount, setResponses]);
 
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
-  }, [currentSection, currentQuestion, setTabSwitchCount, setResponses])
-
-  // Start timer for current question
   useEffect(() => {
-    if (!scenarios[currentQuestion]?.timer) return
-    if (timing[currentQuestion]?.isCompleted) return
-
-    handleStart(currentQuestion)
-
+    if (!scenarios[currentQuestion]?.timer) return;
+    if (timing[currentQuestion]?.isCompleted) return;
+    handleStart(currentQuestion);
     return () => {
       if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-    }
-  }, [currentQuestion, scenarios, timing, handleStart])
+    };
+  }, [currentQuestion, scenarios, timing, handleStart]);
 
-  // Add a timeout for loading
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (isLoading && !scenarios.length) {
-        setErrorMessage("Loading is taking longer than expected. Please refresh the page.")
+        setErrorMessage("Loading is taking longer than expected. Please refresh the page.");
       }
-    }, 10000) // 10 second timeout
+    }, 10000);
+    return () => clearTimeout(timeoutId);
+  }, [isLoading, scenarios.length]);
 
-    return () => clearTimeout(timeoutId)
-  }, [isLoading, scenarios.length])
-
-  // Early return for loading state with better UI feedback
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex justify-center items-center">
@@ -490,10 +456,9 @@ const AssessmentContent = () => {
           )}
         </div>
       </div>
-    )
+    );
   }
 
-  // Error state with retry button
   if (!scenarios.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex justify-center items-center">
@@ -504,11 +469,11 @@ const AssessmentContent = () => {
           </p>
           <button
             onClick={() => {
-              loadingRef.current.inProgress = false
-              initialLoadAttemptedRef.current = false
-              setIsLoading(true)
-              setErrorMessage("")
-              window.location.reload()
+              loadingRef.current.inProgress = false;
+              initialLoadAttemptedRef.current = false;
+              setIsLoading(true);
+              setErrorMessage("");
+              window.location.reload();
             }}
             className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg"
           >
@@ -516,10 +481,10 @@ const AssessmentContent = () => {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  const currentScenario = scenarios[currentQuestion]
+  const currentScenario = scenarios[currentQuestion];
   if (!currentScenario) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex justify-center items-center">
@@ -536,11 +501,11 @@ const AssessmentContent = () => {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  const totalQuestions = scenarios.length
-  const currentQuestionNumber = currentQuestion + 1
+  const totalQuestions = scenarios.length;
+  const currentQuestionNumber = currentQuestion + 1;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex">
@@ -650,8 +615,7 @@ const AssessmentContent = () => {
         onCancel={() => setShowConfirmation(false)}
       />
     </div>
-  )
-}
+  );
+};
 
-export default AssessmentContent
-
+export default AssessmentContent;
