@@ -229,19 +229,23 @@ export const useAssessmentStore = create(
         scenariosLoaded: state.scenariosLoaded,
         storeVersion: STORE_VERSION,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          console.log("State successfully hydrated:", state);
-          setTimeout(() => {
-            const store = useAssessmentStore.getState();
-            store.verifyStoreIntegrity();
-            store.setLoading(false);
-          }, 100);
-        } else {
-          console.error("Hydration failed - starting with fresh state");
-          set({ ...getInitialState(), isLoading: false });
-        }
-      },
+      onRehydrateStorage: () => {
+  // Return a function that has access to the 'set' parameter
+  return (state, error) => {
+    if (state) {
+      console.log("State successfully hydrated:", state);
+      setTimeout(() => {
+        const store = useAssessmentStore.getState();
+        store.verifyStoreIntegrity();
+        store.setLoading(false);
+      }, 100);
+    } else {
+      console.error("Hydration failed - starting with fresh state", error);
+      // Use useAssessmentStore.setState instead of the undefined 'set'
+      useAssessmentStore.setState({ ...getInitialState(), isLoading: false });
+    }
+  };
+}
     }
   )
 );
