@@ -343,35 +343,48 @@ const AssessmentContent = () => {
 
   // Load scenarios with a retry mechanism (up to 3 attempts)
   const loadScenarios = useCallback(async (retry = 0) => {
-    if (loadingRef.current.inProgress) return;
+    if (loadingRef.current.inProgress || scenarios.length > 0) return;
+    
     try {
       loadingRef.current.inProgress = true;
       setIsLoading(true);
+      
       const response = await fetch("/api/fetchScenarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
+        next: { revalidate: 0 } // Disable cache for Next.js
       });
+
       if (!response.ok) {
         throw new Error(`Failed to fetch scenarios: ${response.status}`);
       }
+
       const data = await response.json();
+      
       if (!Array.isArray(data) || data.length === 0) {
         throw new Error("No scenarios available");
       }
+
       setScenarios(data);
       setScenariosLoaded(true);
+
+      // Initialize if not started
       if (!hasStarted) {
-        setRecordId(`assessment-${Date.now()}`);
+        if (!recordId) {
+          setRecordId(`assessment-${Date.now()}`);
+        }
         setCurrentQuestion(0);
         setCurrentSection(data[0]?.topic || "");
         startAssessment();
       }
+
     } catch (error) {
+      console.error("Error loading scenarios:", error);
+      
       if (retry < 3) {
-        setTimeout(() => loadScenarios(retry + 1), 2000);
+        setTimeout(() => loadScenarios(retry + 1), 2000 * (retry + 1)); // Exponential backoff
       } else {
-        console.error("Error loading scenarios:", error);
         setErrorMessage(error.message || "Failed to load assessment");
       }
     } finally {
@@ -380,6 +393,8 @@ const AssessmentContent = () => {
     }
   }, [
     hasStarted,
+    scenarios.length,
+    recordId,
     setScenarios,
     setScenariosLoaded,
     setRecordId,
@@ -388,17 +403,17 @@ const AssessmentContent = () => {
     startAssessment,
   ]);
 
+  // Enhanced initialization effect
   useEffect(() => {
     if (!stateRestoredRef.current) {
       stateRestoredRef.current = true;
       return;
     }
-    if (initialLoadAttemptedRef.current || scenarios.length > 0 || scenariosLoaded) {
-      setIsLoading(false);
-      return;
+
+    if (scenarios.length === 0 && !scenariosLoaded && !initialLoadAttemptedRef.current) {
+      initialLoadAttemptedRef.current = true;
+      loadScenarios();
     }
-    initialLoadAttemptedRef.current = true;
-    loadScenarios();
   }, [scenarios, scenariosLoaded, loadScenarios]);
 
   useEffect(() => {
