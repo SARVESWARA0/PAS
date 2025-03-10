@@ -1,42 +1,37 @@
 "use client";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { useEffect } from "react"; // Needed for useInitializeStore
 
+// Store version helps handle migrations and invalidate corrupted state
 const STORE_VERSION = 1;
 const STORAGE_KEY = "assessment-data-v1";
 
-// Enhanced localStorage check with SSR awareness
+// Helper to check if localStorage is actually available and working
 const isLocalStorageAvailable = () => {
-  if (typeof window === 'undefined') return false;
-  
   try {
     const testKey = "__storage_test__";
-    window.localStorage.setItem(testKey, testKey);
-    window.localStorage.removeItem(testKey);
+    localStorage.setItem(testKey, testKey);
+    localStorage.removeItem(testKey);
     return true;
   } catch (e) {
     return false;
   }
 };
 
-// Enhanced storage creator with SSR handling
+// Create a safer storage mechanism
 const createSafeStorage = () => {
-  if (typeof window === 'undefined') {
-    return {
-      getItem: () => Promise.resolve(null),
-      setItem: () => Promise.resolve(),
-      removeItem: () => Promise.resolve()
-    };
-  }
-
   if (!isLocalStorageAvailable()) {
     console.warn("LocalStorage not available, using in-memory storage");
     let storage = {};
     return {
-      getItem: (name) => Promise.resolve(storage[name] || null),
+      getItem: (name) => {
+        const str = storage[name] || null;
+        return str ? Promise.resolve(str) : Promise.resolve(null);
+      },
       setItem: (name, value) => {
         storage[name] = String(value);
-        return Promise.resolve();
+        return Promise.resolve(true);
       },
       removeItem: (name) => {
         delete storage[name];
@@ -44,36 +39,39 @@ const createSafeStorage = () => {
       },
     };
   }
-
   return {
-    getItem: async (name) => {
+    getItem: (name) => {
       try {
         const str = localStorage.getItem(name);
-        return str || null;
+        if (!str) return Promise.resolve(null);
+        return Promise.resolve(str);
       } catch (err) {
         console.error("Failed to get from localStorage:", err);
-        return null;
+        return Promise.resolve(null);
       }
     },
-    setItem: async (name, value) => {
+    setItem: (name, value) => {
       try {
         localStorage.setItem(name, value);
-        return true;
+        return Promise.resolve(true);
       } catch (err) {
         console.error("Failed to write to localStorage:", err);
-        return false;
+        return Promise.resolve(false);
       }
     },
-    removeItem: async (name) => {
+    removeItem: (name) => {
       try {
         localStorage.removeItem(name);
+        return Promise.resolve();
       } catch (err) {
         console.error("Failed to remove from localStorage:", err);
+        return Promise.resolve();
       }
     },
   };
 };
 
+// Initial state to ensure consistent reset
 const getInitialState = () => ({
   recordId: "",
   currentQuestion: 0,
@@ -92,29 +90,15 @@ const getInitialState = () => ({
   storeVersion: STORE_VERSION,
   resetRequested: false,
   isLoading: true,
-  isHydrated: false // New flag for tracking hydration status
 });
 
 export const useAssessmentStore = create(
   persist(
     (set, get) => ({
       ...getInitialState(),
-      initialize: () => {
-        const state = get();
-        if (!state.recordId && typeof window !== 'undefined') {
-          set({
-            recordId: `assessment-${Date.now()}`,
-            isHydrated: true
-          });
-        }
-      },
 
       // Actions
-      setScenarios: (scenarios) => set({ 
-        scenarios,
-        isLoading: false,
-        scenariosLoaded: true 
-      }),
+      setScenarios: (scenarios) => set({ scenarios }),
 
       startAssessment: () => {
         const state = get();
@@ -122,13 +106,11 @@ export const useAssessmentStore = create(
           set({
             recordId: `assessment-${Date.now()}`,
             hasStarted: true,
-            isHydrated: true
           });
         } else {
           set({ hasStarted: true });
         }
       },
-
 
       completeAssessment: () => set({ isAssessmentComplete: true }),
 
@@ -211,6 +193,7 @@ export const useAssessmentStore = create(
         }
       },
 
+      // Verify store integrity (call this after hydration)
       verifyStoreIntegrity: () => {
         const state = get();
         if (state.storeVersion !== STORE_VERSION) {
@@ -220,30 +203,11 @@ export const useAssessmentStore = create(
         }
         if (state.hasStarted && !state.recordId) {
           console.warn("Assessment started but recordId is missing, fixing...");
-          set({ 
-            recordId: `assessment-${Date.now()}`,
-            isHydrated: true 
-          });
+          set({ recordId: `assessment-${Date.now()}` });
         }
-        set({ 
-          isLoading: false,
-          isHydrated: true 
-        });
+        set({ isLoading: false });
         return true;
       },
-
-      // Enhanced reset
-      resetAssessment: () => {
-        set({ resetRequested: true });
-        set({
-          ...getInitialState(),
-          isHydrated: true,
-          recordId: `assessment-${Date.now()}`
-        });
-        if (typeof window !== 'undefined' && isLocalStorageAvailable()) {
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      }
     }),
     {
       name: STORAGE_KEY,
@@ -264,39 +228,32 @@ export const useAssessmentStore = create(
         isAssessmentComplete: state.isAssessmentComplete,
         scenariosLoaded: state.scenariosLoaded,
         storeVersion: STORE_VERSION,
-        isHydrated: state.isHydrated
       }),
-      onRehydrateStorage: () => (state, error) => {
-        if (state) {
-          console.log("State successfully hydrated:", state);
-          setTimeout(() => {
-            const store = useAssessmentStore.getState();
-            store.initialize();
-            store.verifyStoreIntegrity();
-          }, 100);
-        } else {
-          console.error("Hydration failed - starting with fresh state", error);
-          useAssessmentStore.setState({
-            ...getInitialState(),
-            isLoading: false,
-            isHydrated: true,
-            recordId: `assessment-${Date.now()}`
-          });
-        }
+      onRehydrateStorage: () => {
+        // Return a function that has access to the 'set' parameter
+        return (state, error) => {
+          if (state) {
+            console.log("State successfully hydrated:", state);
+            setTimeout(() => {
+              const store = useAssessmentStore.getState();
+              store.verifyStoreIntegrity();
+              store.setLoading(false);
+            }, 100);
+          } else {
+            console.error("Hydration failed - starting with fresh state", error);
+            // Use useAssessmentStore.setState instead of the undefined 'set'
+            useAssessmentStore.setState({ ...getInitialState(), isLoading: false });
+          }
+        };
       }
     }
   )
 );
 
-// Enhanced initialization hook
 export const useInitializeStore = () => {
-  const { verifyStoreIntegrity, isLoading, isHydrated, initialize } = useAssessmentStore();
+  const { verifyStoreIntegrity, isLoading } = useAssessmentStore();
 
   useEffect(() => {
-    if (!isHydrated) {
-      initialize();
-    }
-
     const timer = setTimeout(() => {
       if (isLoading) {
         verifyStoreIntegrity();
@@ -304,7 +261,7 @@ export const useInitializeStore = () => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [verifyStoreIntegrity, isLoading, isHydrated, initialize]);
+  }, [verifyStoreIntegrity, isLoading]);
 
   return isLoading;
 };
