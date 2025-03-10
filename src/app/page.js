@@ -82,7 +82,6 @@ export default function LandingPage() {
           <div className="flex items-center space-x-2">
             {/* Add your logo or branding here */}
           </div>
-          
         </nav>
 
         <div className="text-center mb-20">
@@ -138,6 +137,14 @@ export default function LandingPage() {
               Validate Key & Proceed <ArrowRight className="h-6 w-6" />
             </button>
           </form>
+
+          {/* Testing button to set resetRequested flag */}
+          <button
+            onClick={() => useAssessmentStore.getState().setResetRequested(true)}
+            className="mt-4 px-4 py-2 bg-amber-500 text-white rounded"
+          >
+            Go to Thank You Page
+          </button>
 
           <div className="mt-8 text-sm text-center text-blue-300">
             By validating your key, you agree to our monitoring and evaluation process.
