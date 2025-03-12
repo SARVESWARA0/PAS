@@ -18,7 +18,7 @@ const getInitialState = () => ({
   tabSwitchCount: 0,
   unusualTypingCount: 0,
   timeOverruns: {},
-  isAssessmentComplete: false,
+  completed: false, // new flag to indicate assessment has been completed
   scenariosLoaded: false, // flag to indicate scenarios have been fetched
   resetRequested: false,
   isLoading: true,
@@ -45,7 +45,8 @@ export const useAssessmentStore = create(
           set({ hasStarted: true });
         }
       },
-      completeAssessment: () => set({ isAssessmentComplete: true }),
+      // Updated completeAssessment to mark the assessment as completed
+      completeAssessment: () => set({ completed: true }),
       setScenariosLoaded: (loaded) => set({ scenariosLoaded: loaded }),
       setRecordId: (recordId) => set({ recordId }),
       setCurrentQuestion: (currentQuestion) => set({ currentQuestion }),
@@ -97,7 +98,14 @@ export const useAssessmentStore = create(
         })),
       setLoading: (isLoading) => set({ isLoading }),
       setResetRequested: (flag) => set({ resetRequested: flag }),
-      resetAssessment: () => set(getInitialState()),
+      // resetAssessment now resets the state except for the 'completed' flag
+      resetAssessment: () => {
+        const { completed } = get();
+        return set({
+          ...getInitialState(),
+          completed, // preserve the completion status
+        });
+      },
       verifyStoreIntegrity: () => {
         const state = get();
         if (state.storeVersion !== STORE_VERSION) {
@@ -124,7 +132,7 @@ export const useAssessmentStore = create(
         tabSwitchCount: state.tabSwitchCount,
         unusualTypingCount: state.unusualTypingCount,
         timeOverruns: state.timeOverruns,
-        isAssessmentComplete: state.isAssessmentComplete,
+        completed: state.completed,
         scenariosLoaded: state.scenariosLoaded,
         resetRequested: state.resetRequested,
         storeVersion: state.storeVersion,

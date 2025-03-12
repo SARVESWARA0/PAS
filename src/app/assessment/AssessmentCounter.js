@@ -22,6 +22,7 @@ export default function AssessmentContent() {
     scenarios,
     scenariosLoaded,
     isRehydrated,
+    completed, // new flag
     setCurrentQuestion,
     setCurrentSection,
     setResponses,
@@ -37,27 +38,27 @@ export default function AssessmentContent() {
     setTabSwitchCount,
     setUnusualTypingCount,
     setTimeOverruns,
+    // Instead of using setResetRequested/resetAssessment, use completeAssessment
+    completeAssessment,
     hasStarted,
-    startAssessment,
-    resetAssessment,
-    setResetRequested,
+    startAssessment
   } = useAssessmentStore();
 
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [blockCopyPaste, setBlockCopyPaste] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timerRef = useRef(null);
   const loadingRef = useRef({ attempted: false, inProgress: false });
 
-  // Redirect to thank-you if resetRequested is true
+  // If the assessment has been completed, redirect immediately
   useEffect(() => {
-    if (useAssessmentStore.getState().resetRequested) {
+    if (completed) {
       router.push("/thank-you");
     }
-  }, [router]);
-
+  }, [completed, router]);
   // Define loadScenarios before using it in the effect.
   const loadScenarios = useCallback(async (retry = 0) => {
     if (loadingRef.current.inProgress) return;
@@ -265,7 +266,10 @@ export default function AssessmentContent() {
     [blockCopyPaste, currentQuestion, currentSection, setPasteCount, setResponses]
   );
 
+  // Submission & Navigation with prevention of multiple submissions
   const handleSubmit = useCallback(async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setShowConfetti(true);
     try {
       const payload = {
@@ -310,13 +314,14 @@ export default function AssessmentContent() {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      setResetRequested(true);
-      resetAssessment();
+      // Mark the assessment as completed so the user cannot attend again
+      completeAssessment();
       router.push("/thank-you");
     } catch (error) {
       console.error("Error submitting assessment:", error);
       setErrorMessage("Failed to submit assessment: " + error.message);
       setShowConfetti(false);
+      setIsSubmitting(false);
     }
   }, [
     recordId,
@@ -328,9 +333,10 @@ export default function AssessmentContent() {
     timeOverruns,
     totalTimeTaken,
     router,
-    setResetRequested,
-    resetAssessment,
+    completeAssessment,
+    isSubmitting,
   ]);
+
 
   const handleNext = useCallback(() => {
     if (!scenarios[currentQuestion]) {
@@ -550,6 +556,7 @@ export default function AssessmentContent() {
         onConfirm={handleSubmit}
         onCancel={() => setShowConfirmation(false)}
       />
+      {isSubmitting && <LoadingSpinner />}
     </div>
   );
 }

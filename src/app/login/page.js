@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
 import { useAssessmentStore } from "../store/assessmentStore"
+import LoadingSpinner from "../components/LoadingSpinner"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -20,12 +21,11 @@ export default function LoginPage() {
   const [colleges, setColleges] = useState([])
   const [departments, setDepartments] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [collegeSearch, setCollegeSearch] = useState("")
   const [departmentSearch, setDepartmentSearch] = useState("")
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false)
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false)
-  const [customCollege, setCustomCollege] = useState(false)
-  const [customDepartment, setCustomDepartment] = useState(false)
   const [selectedCollegeIndex, setSelectedCollegeIndex] = useState(-1)
   const [selectedDepartmentIndex, setSelectedDepartmentIndex] = useState(-1)
   const router = useRouter()
@@ -65,10 +65,10 @@ export default function LoginPage() {
     if (name === "phone") {
       const phone = value.replace(/\D/g, "")
       if (phone.length > 10) {
-        setFormErrors(prev => ({...prev, phone: "Phone number must be exactly 10 digits."}))
+        setFormErrors(prev => ({ ...prev, phone: "Phone number must be exactly 10 digits." }))
         return
       } else {
-        setFormErrors(prev => ({...prev, phone: ""}))
+        setFormErrors(prev => ({ ...prev, phone: "" }))
       }
       setFormData({ ...formData, phone })
     } else {
@@ -78,7 +78,7 @@ export default function LoginPage() {
     // Clear errors when field is filled
     if (name === "college" || name === "department") {
       if (value.trim()) {
-        setFormErrors(prev => ({...prev, [name]: ""}))
+        setFormErrors(prev => ({ ...prev, [name]: "" }))
       }
     }
   }
@@ -100,7 +100,7 @@ export default function LoginPage() {
       isValid = false
     }
 
-    setFormErrors({...formErrors, ...errors})
+    setFormErrors(prev => ({ ...prev, ...errors }))
     return isValid
   }
 
@@ -111,6 +111,7 @@ export default function LoginPage() {
       return
     }
     
+    setIsSubmitting(true)
     try {
       const response = await fetch("/api/airtable", {
         method: "POST",
@@ -125,18 +126,20 @@ export default function LoginPage() {
         router.push(`/assessment`)
       } else {
         console.error("Error submitting form")
+        setIsSubmitting(false)
       }
     } catch (error) {
       console.error("Error submitting form:", error)
+      setIsSubmitting(false)
     }
   }
 
   const filteredColleges = colleges.filter((college) =>
-    college.toLowerCase().includes(collegeSearch.toLowerCase()),
+    college.toLowerCase().includes(collegeSearch.toLowerCase())
   )
 
   const filteredDepartments = departments.filter((department) =>
-    department.toLowerCase().includes(departmentSearch.toLowerCase()),
+    department.toLowerCase().includes(departmentSearch.toLowerCase())
   )
 
   const handleKeyDown = (e, type) => {
@@ -152,7 +155,7 @@ export default function LoginPage() {
         const selectedCollege = filteredColleges[selectedCollegeIndex]
         setFormData((prev) => ({ ...prev, college: selectedCollege }))
         setCollegeSearch(selectedCollege)
-        setFormErrors(prev => ({...prev, college: ""}))
+        setFormErrors(prev => ({ ...prev, college: "" }))
         setShowCollegeDropdown(false)
       }
     } else if (type === "department") {
@@ -167,10 +170,15 @@ export default function LoginPage() {
         const selectedDepartment = filteredDepartments[selectedDepartmentIndex]
         setFormData((prev) => ({ ...prev, department: selectedDepartment }))
         setDepartmentSearch(selectedDepartment)
-        setFormErrors(prev => ({...prev, department: ""}))
+        setFormErrors(prev => ({ ...prev, department: "" }))
         setShowDepartmentDropdown(false)
       }
     }
+  }
+
+  // Show submission loading spinner if the form is being submitted
+  if (isSubmitting) {
+    return <LoadingSpinner />
   }
 
   if (isLoading) {
@@ -216,234 +224,136 @@ export default function LoginPage() {
             <label className="block text-sm font-semibold text-gray-700 flex items-center">
               College <span className="text-red-500 ml-1">*</span>
             </label>
-            {!customCollege ? (
-              <div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search for your college..."
-                    className={`w-full px-4 py-3 rounded-xl border ${
-                      formErrors.college ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
-                    value={collegeSearch}
-                    onChange={(e) => {
-                      setCollegeSearch(e.target.value)
-                      setShowCollegeDropdown(true)
-                      setSelectedCollegeIndex(-1)
-                      if (e.target.value === formData.college) {
-                        setFormErrors(prev => ({...prev, college: ""}))
-                      }
-                    }}
-                    onFocus={() => setShowCollegeDropdown(true)}
-                    onKeyDown={(e) => handleKeyDown(e, "college")}
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    {showCollegeDropdown ? (
-                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                    )}
-                  </div>
-                  {showCollegeDropdown && (
-                    <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
-                      {filteredColleges.length > 0 ? (
-                        filteredColleges.map((college, index) => (
-                          <button
-                            key={`college-${index}-${college}`}
-                            type="button"
-                            className={`w-full text-left px-4 py-3 hover:bg-blue-50 focus:outline-none text-gray-700 transition-colors ${
-                              index === selectedCollegeIndex ? "bg-blue-100" : ""
-                            }`}
-                            onClick={() => {
-                              setFormData((prev) => ({ ...prev, college }))
-                              setCollegeSearch(college)
-                              setFormErrors(prev => ({...prev, college: ""}))
-                              setShowCollegeDropdown(false)
-                            }}
-                          >
-                            {college}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="p-4">
-                          <p className="text-sm text-gray-500">No college found</p>
-                          <button
-                            type="button"
-                            className="mt-2 w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            onClick={() => {
-                              if (collegeSearch.trim()) {
-                                setCustomCollege(true)
-                                setFormData((prev) => ({ ...prev, college: collegeSearch }))
-                                setFormErrors(prev => ({...prev, college: ""}))
-                                setShowCollegeDropdown(false)
-                              } else {
-                                setFormErrors(prev => ({...prev, college: "College name is required"}))
-                              }
-                            }}
-                          >
-                            Add new college
-                          </button>
-                        </div>
-                      )}
-                    </div>
+            <div>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search for your college..."
+                  className={`w-full px-4 py-3 rounded-xl border ${
+                    formErrors.college ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
+                  value={collegeSearch}
+                  onChange={(e) => {
+                    setCollegeSearch(e.target.value)
+                    setShowCollegeDropdown(true)
+                    setSelectedCollegeIndex(-1)
+                    if (e.target.value === formData.college) {
+                      setFormErrors(prev => ({ ...prev, college: "" }))
+                    }
+                  }}
+                  onFocus={() => setShowCollegeDropdown(true)}
+                  onKeyDown={(e) => handleKeyDown(e, "college")}
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  {showCollegeDropdown ? (
+                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
                   )}
                 </div>
-                {formErrors.college && (
-                  <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{formErrors.college}</span>
+                {showCollegeDropdown && (
+                  <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                    {filteredColleges.length > 0 ? (
+                      filteredColleges.map((college, index) => (
+                        <button
+                          key={`college-${index}-${college}`}
+                          type="button"
+                          className={`w-full text-left px-4 py-3 hover:bg-blue-50 focus:outline-none text-gray-700 transition-colors ${
+                            index === selectedCollegeIndex ? "bg-blue-100" : ""
+                          }`}
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, college }))
+                            setCollegeSearch(college)
+                            setFormErrors(prev => ({ ...prev, college: "" }))
+                            setShowCollegeDropdown(false)
+                          }}
+                        >
+                          {college}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-4">
+                        <p className="text-sm text-gray-500">No college found</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="flex gap-2 flex-col">
-                <div className="flex gap-2">
-                  <input
-                    name="college"
-                    value={formData.college}
-                    onChange={handleChange}
-                    placeholder="Enter college name"
-                    className={`flex-1 px-4 py-3 rounded-xl border ${
-                      formErrors.college ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
-                  />
-                  <button
-                    type="button"
-                    className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors"
-                    onClick={() => {
-                      setCustomCollege(false)
-                      setFormData((prev) => ({ ...prev, college: "" }))
-                      setCollegeSearch("")
-                    }}
-                  >
-                    Cancel
-                  </button>
+              {formErrors.college && (
+                <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{formErrors.college}</span>
                 </div>
-                {formErrors.college && (
-                  <div className="flex items-center gap-2 text-red-500 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{formErrors.college}</span>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="relative search-dropdown space-y-1" ref={departmentDropdownRef}>
             <label className="block text-sm font-semibold text-gray-700 flex items-center">
               Department <span className="text-red-500 ml-1">*</span>
             </label>
-            {!customDepartment ? (
-              <div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search for your department..."
-                    className={`w-full px-4 py-3 rounded-xl border ${
-                      formErrors.department ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
-                    value={departmentSearch}
-                    onChange={(e) => {
-                      setDepartmentSearch(e.target.value)
-                      setShowDepartmentDropdown(true)
-                      setSelectedDepartmentIndex(-1)
-                      if (e.target.value === formData.department) {
-                        setFormErrors(prev => ({...prev, department: ""}))
-                      }
-                    }}
-                    onFocus={() => setShowDepartmentDropdown(true)}
-                    onKeyDown={(e) => handleKeyDown(e, "department")}
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    {showDepartmentDropdown ? (
-                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                    )}
-                  </div>
-                  {showDepartmentDropdown && (
-                    <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
-                      {filteredDepartments.length > 0 ? (
-                        filteredDepartments.map((department, index) => (
-                          <button
-                            key={`department-${index}-${department}`}
-                            type="button"
-                            className={`w-full text-left px-4 py-3 hover:bg-blue-50 focus:outline-none text-gray-700 transition-colors ${
-                              index === selectedDepartmentIndex ? "bg-blue-100" : ""
-                            }`}
-                            onClick={() => {
-                              setFormData((prev) => ({ ...prev, department }))
-                              setDepartmentSearch(department)
-                              setFormErrors(prev => ({...prev, department: ""}))
-                              setShowDepartmentDropdown(false)
-                            }}
-                          >
-                            {department}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="p-4">
-                          <p className="text-sm text-gray-500">No department found</p>
-                          <button
-                            type="button"
-                            className="mt-2 w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            onClick={() => {
-                              if (departmentSearch.trim()) {
-                                setCustomDepartment(true)
-                                setFormData((prev) => ({ ...prev, department: departmentSearch }))
-                                setFormErrors(prev => ({...prev, department: ""}))
-                                setShowDepartmentDropdown(false)
-                              } else {
-                                setFormErrors(prev => ({...prev, department: "Department name is required"}))
-                              }
-                            }}
-                          >
-                            Add new department
-                          </button>
-                        </div>
-                      )}
-                    </div>
+            <div>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search for your department..."
+                  className={`w-full px-4 py-3 rounded-xl border ${
+                    formErrors.department ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
+                  value={departmentSearch}
+                  onChange={(e) => {
+                    setDepartmentSearch(e.target.value)
+                    setShowDepartmentDropdown(true)
+                    setSelectedDepartmentIndex(-1)
+                    if (e.target.value === formData.department) {
+                      setFormErrors(prev => ({ ...prev, department: "" }))
+                    }
+                  }}
+                  onFocus={() => setShowDepartmentDropdown(true)}
+                  onKeyDown={(e) => handleKeyDown(e, "department")}
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  {showDepartmentDropdown ? (
+                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
                   )}
                 </div>
-                {formErrors.department && (
-                  <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{formErrors.department}</span>
+                {showDepartmentDropdown && (
+                  <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                    {filteredDepartments.length > 0 ? (
+                      filteredDepartments.map((department, index) => (
+                        <button
+                          key={`department-${index}-${department}`}
+                          type="button"
+                          className={`w-full text-left px-4 py-3 hover:bg-blue-50 focus:outline-none text-gray-700 transition-colors ${
+                            index === selectedDepartmentIndex ? "bg-blue-100" : ""
+                          }`}
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, department }))
+                            setDepartmentSearch(department)
+                            setFormErrors(prev => ({ ...prev, department: "" }))
+                            setShowDepartmentDropdown(false)
+                          }}
+                        >
+                          {department}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-4">
+                        <p className="text-sm text-gray-500">No department found</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="flex gap-2 flex-col">
-                <div className="flex gap-2">
-                  <input
-                    name="department"
-                    value={formData.department}
-                    onChange={handleChange}
-                    placeholder="Enter department name"
-                    className={`flex-1 px-4 py-3 rounded-xl border ${
-                      formErrors.department ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 bg-gray-50 transition-all placeholder-gray-400`}
-                  />
-                  <button
-                    type="button"
-                    className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 transition-colors"
-                    onClick={() => {
-                      setCustomDepartment(false)
-                      setFormData((prev) => ({ ...prev, department: "" }))
-                      setDepartmentSearch("")
-                    }}
-                  >
-                    Cancel
-                  </button>
+              {formErrors.department && (
+                <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{formErrors.department}</span>
                 </div>
-                {formErrors.department && (
-                  <div className="flex items-center gap-2 text-red-500 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{formErrors.department}</span>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -489,6 +399,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
+            disabled={isSubmitting}
             className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transform hover:scale-[1.02]"
           >
             Start Assessment

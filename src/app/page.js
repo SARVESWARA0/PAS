@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Star, Clock, Brain, Mail, Shield, Flame } from "lucide-react";
 import { useAssessmentStore } from "./store/assessmentStore"; 
@@ -9,11 +9,17 @@ export default function LandingPage() {
   const router = useRouter();
   const [keyInput, setKeyInput] = useState("");
   const [error, setError] = useState("");
-  const resetRequested = useAssessmentStore((state) => state.resetRequested);
+  const completed = useAssessmentStore((state) => state.completed);
 
-  // If the flag is set, immediately redirect to the thank-you page
-  if (resetRequested) {
-    router.push("/thank-you");
+  // Redirect in an effect so that router.push is not called during render
+  useEffect(() => {
+    if (completed) {
+      router.push("/thank-you");
+    }
+  }, [completed, router]);
+
+  // Optionally, return null while redirection is pending
+  if (completed) {
     return null;
   }
 
@@ -21,7 +27,7 @@ export default function LandingPage() {
     e.preventDefault();
     setError("");
     // Check again in case the flag is set during interaction
-    if (resetRequested) {
+    if (completed) {
       router.push("/thank-you");
       return;
     }
@@ -36,7 +42,6 @@ export default function LandingPage() {
     });
     const data = await res.json();
     if (data.success) {
-      // On successful validation, navigate to login
       router.push("/login");
     } else {
       setError(data.message || "Invalid key");
