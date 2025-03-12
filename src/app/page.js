@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Star, Clock, Brain, Mail, Shield, Flame } from "lucide-react";
 import { useAssessmentStore } from "./store/assessmentStore"; 
@@ -11,16 +11,20 @@ export default function LandingPage() {
   const [error, setError] = useState("");
   const resetRequested = useAssessmentStore((state) => state.resetRequested);
 
-  // Redirect to thank-you page if resetRequested is true
-  useEffect(() => {
-    if (resetRequested) {
-      router.push("/thank-you");
-    }
-  }, [resetRequested, router]);
+  // If the flag is set, immediately redirect to the thank-you page
+  if (resetRequested) {
+    router.push("/thank-you");
+    return null;
+  }
 
   const handleKeyValidation = async (e) => {
     e.preventDefault();
     setError("");
+    // Check again in case the flag is set during interaction
+    if (resetRequested) {
+      router.push("/thank-you");
+      return;
+    }
     if (!keyInput.trim()) {
       setError("Please enter an assessment key.");
       return;
@@ -32,7 +36,7 @@ export default function LandingPage() {
     });
     const data = await res.json();
     if (data.success) {
-      // Redirect to your login page (which you already have)
+      // On successful validation, navigate to login
       router.push("/login");
     } else {
       setError(data.message || "Invalid key");
@@ -137,14 +141,6 @@ export default function LandingPage() {
               Validate Key & Proceed <ArrowRight className="h-6 w-6" />
             </button>
           </form>
-
-          {/* Testing button to set resetRequested flag */}
-          <button
-            onClick={() => useAssessmentStore.getState().setResetRequested(true)}
-            className="mt-4 px-4 py-2 bg-amber-500 text-white rounded"
-          >
-            Go to Thank You Page
-          </button>
 
           <div className="mt-8 text-sm text-center text-blue-300">
             By validating your key, you agree to our monitoring and evaluation process.

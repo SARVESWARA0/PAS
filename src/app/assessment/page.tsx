@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Suspense } from "react";
+import { useRouter } from "next/navigation";
 import AssessmentContent from "./AssessmentCounter";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useAssessmentStore } from "../store/assessmentStore";
@@ -11,12 +10,11 @@ export default function AssessmentPage() {
   const router = useRouter();
   const resetRequested = useAssessmentStore((state) => state.resetRequested);
 
-  // Redirect to thank-you page if resetRequested is true
-  useEffect(() => {
-    if (resetRequested) {
-      router.push("/thank-you");
-    }
-  }, [resetRequested, router]);
+  // Immediately redirect if the flag is set
+  if (resetRequested) {
+    router.push("/thank-you");
+    return null;
+  }
 
   return (
     <Suspense fallback={<LoadingSpinner />}>

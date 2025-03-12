@@ -1,77 +1,10 @@
 "use client";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { useEffect } from "react"; // Needed for useInitializeStore
 
-// Store version helps handle migrations and invalidate corrupted state
 const STORE_VERSION = 1;
 const STORAGE_KEY = "assessment-data-v1";
 
-// Helper to check if localStorage is actually available and working
-const isLocalStorageAvailable = () => {
-  try {
-    const testKey = "__storage_test__";
-    localStorage.setItem(testKey, testKey);
-    localStorage.removeItem(testKey);
-    return true;
-  } catch (e) {
-    return false;
-  }
-};
-
-// Create a safer storage mechanism
-const createSafeStorage = () => {
-  if (!isLocalStorageAvailable()) {
-    console.warn("LocalStorage not available, using in-memory storage");
-    let storage = {};
-    return {
-      getItem: (name) => {
-        const str = storage[name] || null;
-        return str ? Promise.resolve(str) : Promise.resolve(null);
-      },
-      setItem: (name, value) => {
-        storage[name] = String(value);
-        return Promise.resolve(true);
-      },
-      removeItem: (name) => {
-        delete storage[name];
-        return Promise.resolve();
-      },
-    };
-  }
-  return {
-    getItem: (name) => {
-      try {
-        const str = localStorage.getItem(name);
-        if (!str) return Promise.resolve(null);
-        return Promise.resolve(str);
-      } catch (err) {
-        console.error("Failed to get from localStorage:", err);
-        return Promise.resolve(null);
-      }
-    },
-    setItem: (name, value) => {
-      try {
-        localStorage.setItem(name, value);
-        return Promise.resolve(true);
-      } catch (err) {
-        console.error("Failed to write to localStorage:", err);
-        return Promise.resolve(false);
-      }
-    },
-    removeItem: (name) => {
-      try {
-        localStorage.removeItem(name);
-        return Promise.resolve();
-      } catch (err) {
-        console.error("Failed to remove from localStorage:", err);
-        return Promise.resolve();
-      }
-    },
-  };
-};
-
-// Initial state to ensure consistent reset
 const getInitialState = () => ({
   recordId: "",
   currentQuestion: 0,
@@ -86,10 +19,11 @@ const getInitialState = () => ({
   unusualTypingCount: 0,
   timeOverruns: {},
   isAssessmentComplete: false,
-  scenariosLoaded: false,
-  storeVersion: STORE_VERSION,
+  scenariosLoaded: false, // flag to indicate scenarios have been fetched
   resetRequested: false,
   isLoading: true,
+  isRehydrated: false, // new flag indicating rehydration complete
+  storeVersion: STORE_VERSION,
 });
 
 export const useAssessmentStore = create(
@@ -98,8 +32,8 @@ export const useAssessmentStore = create(
       ...getInitialState(),
 
       // Actions
-      setScenarios: (scenarios) => set({ scenarios }),
-
+      setScenarios: (scenarios) =>
+        set({ scenarios, scenariosLoaded: true, isLoading: false }),
       startAssessment: () => {
         const state = get();
         if (!state.recordId) {
@@ -111,23 +45,16 @@ export const useAssessmentStore = create(
           set({ hasStarted: true });
         }
       },
-
       completeAssessment: () => set({ isAssessmentComplete: true }),
-
       setScenariosLoaded: (loaded) => set({ scenariosLoaded: loaded }),
-
       setRecordId: (recordId) => set({ recordId }),
-
       setCurrentQuestion: (currentQuestion) => set({ currentQuestion }),
-
       setCurrentSection: (currentSection) => set({ currentSection }),
-
       setResponses: (updater) =>
         set((state) => ({
           responses:
             typeof updater === "function" ? updater(state.responses) : updater,
         })),
-
       setTiming: (updater) =>
         set((state) => {
           const newTiming =
@@ -137,7 +64,6 @@ export const useAssessmentStore = create(
           }
           return {};
         }),
-
       setTotalTimeTaken: (updater) =>
         set((state) => ({
           totalTimeTaken:
@@ -145,19 +71,18 @@ export const useAssessmentStore = create(
               ? updater(state.totalTimeTaken)
               : updater,
         })),
-
       setPasteCount: (updater) =>
         set((state) => ({
           pasteCount:
             typeof updater === "function" ? updater(state.pasteCount) : updater,
         })),
-
       setTabSwitchCount: (updater) =>
         set((state) => ({
           tabSwitchCount:
-            typeof updater === "function" ? updater(state.tabSwitchCount) : updater,
+            typeof updater === "function"
+              ? updater(state.tabSwitchCount)
+              : updater,
         })),
-
       setUnusualTypingCount: (updater) =>
         set((state) => ({
           unusualTypingCount:
@@ -165,53 +90,27 @@ export const useAssessmentStore = create(
               ? updater(state.unusualTypingCount)
               : updater,
         })),
-
       setTimeOverruns: (updater) =>
         set((state) => ({
           timeOverruns:
-            typeof updater === "function"
-              ? updater(state.timeOverruns)
-              : updater,
+            typeof updater === "function" ? updater(state.timeOverruns) : updater,
         })),
-
-      // Set loading state
       setLoading: (isLoading) => set({ isLoading }),
-
-      // New action to set the reset flag
       setResetRequested: (flag) => set({ resetRequested: flag }),
-
-      // Reset the entire assessment (including clearing scenarios and reset flag)
-      resetAssessment: () => {
-        set({ resetRequested: true });
-        set(getInitialState());
-        try {
-          if (isLocalStorageAvailable()) {
-            localStorage.removeItem(STORAGE_KEY);
-          }
-        } catch (err) {
-          console.error("Failed to clear localStorage during reset:", err);
-        }
-      },
-
-      // Verify store integrity (call this after hydration)
+      resetAssessment: () => set(getInitialState()),
       verifyStoreIntegrity: () => {
         const state = get();
         if (state.storeVersion !== STORE_VERSION) {
-          console.warn("Store version mismatch, resetting state");
-          get().resetAssessment();
-          return false;
-        }
-        if (state.hasStarted && !state.recordId) {
-          console.warn("Assessment started but recordId is missing, fixing...");
-          set({ recordId: `assessment-${Date.now()}` });
+          set(getInitialState());
         }
         set({ isLoading: false });
         return true;
       },
+      setRehydrated: () => set({ isRehydrated: true }),
     }),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => createSafeStorage()),
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         recordId: state.recordId,
         currentQuestion: state.currentQuestion,
@@ -227,41 +126,17 @@ export const useAssessmentStore = create(
         timeOverruns: state.timeOverruns,
         isAssessmentComplete: state.isAssessmentComplete,
         scenariosLoaded: state.scenariosLoaded,
-        storeVersion: STORE_VERSION,
+        resetRequested: state.resetRequested,
+        storeVersion: state.storeVersion,
       }),
-      onRehydrateStorage: () => {
-        // Return a function that has access to the 'set' parameter
-        return (state, error) => {
-          if (state) {
-            console.log("State successfully hydrated:", state);
-            setTimeout(() => {
-              const store = useAssessmentStore.getState();
-              store.verifyStoreIntegrity();
-              store.setLoading(false);
-            }, 100);
-          } else {
-            console.error("Hydration failed - starting with fresh state", error);
-            // Use useAssessmentStore.setState instead of the undefined 'set'
-            useAssessmentStore.setState({ ...getInitialState(), isLoading: false });
-          }
-        };
-      }
+      onRehydrateStorage: () => (state, error) => {
+        if (state) {
+          state.setRehydrated();
+          state.verifyStoreIntegrity();
+        } else {
+          console.error("Failed to rehydrate assessment store:", error);
+        }
+      },
     }
   )
 );
-
-export const useInitializeStore = () => {
-  const { verifyStoreIntegrity, isLoading } = useAssessmentStore();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isLoading) {
-        verifyStoreIntegrity();
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [verifyStoreIntegrity, isLoading]);
-
-  return isLoading;
-};
