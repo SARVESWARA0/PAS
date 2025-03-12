@@ -1,45 +1,15 @@
 import type React from "react";
-import "./GearLoadingSpinner.css"; // We'll create this CSS file separately
 
-const GearLoadingSpinner: React.FC = () => {
+const CustomLoader: React.FC = () => {
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="gearbox">
-        <div className="overlay"></div>
-        <div className="gear one">
-          <div className="gear-inner">
-            <div className="bar"></div>
-            <div className="bar"></div>
-            <div className="bar"></div>
-          </div>
-        </div>
-        <div className="gear two">
-          <div className="gear-inner">
-            <div className="bar"></div>
-            <div className="bar"></div>
-            <div className="bar"></div>
-          </div>
-        </div>
-        <div className="gear three">
-          <div className="gear-inner">
-            <div className="bar"></div>
-            <div className="bar"></div>
-            <div className="bar"></div>
-          </div>
-        </div>
-        <div className="gear four large">
-          <div className="gear-inner">
-            <div className="bar"></div>
-            <div className="bar"></div>
-            <div className="bar"></div>
-            <div className="bar"></div>
-            <div className="bar"></div>
-            <div className="bar"></div>
-          </div>
-        </div>
+    <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
+      <div className="relative">
+        {/* Rotating outer ring */}
+        <div className="w-24 h-24 rounded-full border-8 border-indigo-500 border-t-transparent animate-spin"></div>
+        
       </div>
     </div>
   );
 };
 
-export default GearLoadingSpinner;
+export default CustomLoader;
